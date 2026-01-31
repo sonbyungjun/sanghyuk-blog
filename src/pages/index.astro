@@ -12,7 +12,7 @@ import MainLayout from "@/layouts/MainLayout.astro";
 const allPosts = await getCollection("blog", ({ data }) => {
   return (
     !data.locale &&
-    data.title !== "정현수 포트폴리오" &&
+    data.title !== "손상혁 포트폴리오" &&
     !data.tags.includes("short") &&
     !data.tags.includes("side-project-devlog")
   );

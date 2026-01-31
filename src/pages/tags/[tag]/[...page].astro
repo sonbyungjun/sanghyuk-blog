@@ -9,7 +9,7 @@ import MainLayout from "@/layouts/MainLayout.astro";
 
 export async function getStaticPaths() {
   const allPosts = await getCollection("blog", ({ data }) => {
-    return !data.locale && data.title !== "정현수 포트폴리오";
+    return !data.locale && data.title !== "손상혁 포트폴리오";
   });
 
   const posts = allPosts.sort((a, b) => {
