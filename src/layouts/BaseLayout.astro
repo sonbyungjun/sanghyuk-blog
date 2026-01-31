@@ -1,0 +1,221 @@
+---
+import "@/styles/globals.css";
+
+interface Props {
+  title: string;
+  description?: string;
+  image?: string;
+  canonicalURL?: string;
+}
+
+const {
+  title,
+  description = "프론트엔드 엔지니어 정현수입니다.",
+  image = "/og.webp",
+  canonicalURL = Astro.url.href,
+} = Astro.props;
+
+const siteTitle = title ? `${title} | 정현수 블로그` : "정현수 블로그";
+---
+
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/webp" href="/favicon.webp" />
+    <link rel="canonical" href={canonicalURL} />
+
+    <!-- Primary Meta Tags -->
+    <title>{siteTitle}</title>
+    <meta name="title" content={siteTitle} />
+    <meta name="description" content={description} />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={canonicalURL} />
+    <meta property="og:title" content={siteTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content={new URL(image, Astro.site).href} />
+    <meta property="og:locale" content="ko_KR" />
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content={canonicalURL} />
+    <meta property="twitter:title" content={siteTitle} />
+    <meta property="twitter:description" content={description} />
+    <meta property="twitter:image" content={new URL(image, Astro.site).href} />
+
+    <!-- Fonts -->
+    <link
+      rel="stylesheet"
+      as="style"
+      crossorigin
+      href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"
+    />
+
+    <!-- Dark mode initialization script (prevents FOUC) -->
+    <script is:inline>
+      const theme = (() => {
+        if (typeof localStorage !== "undefined" && localStorage.getItem("theme")) {
+          return localStorage.getItem("theme");
+        }
+        if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+          return "dark";
+        }
+        return "light";
+      })();
+
+      if (theme === "dark") {
+        document.documentElement.classList.add("dark");
+      } else {
+        document.documentElement.classList.remove("dark");
+      }
+
+      window.localStorage.setItem("theme", theme);
+    </script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-6P098S0HE9"></script>
+    <script is:inline>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-6P098S0HE9');
+    </script>
+
+    <!-- Microsoft Clarity -->
+    <script is:inline>
+      (function(c,l,a,r,i,t,y){
+        c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+        t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+        y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+      })(window, document, "clarity", "script", "guzda4dk44");
+    </script>
+  </head>
+  <body class="min-h-screen bg-background text-foreground antialiased">
+    <slot />
+    <script is:inline>
+      document.addEventListener("click", function(e) {
+        const link = e.target.closest("[data-evidence-target]");
+        if (!link) return;
+        
+        e.preventDefault();
+        const targetId = link.dataset.evidenceTarget;
+        const targetEl = document.getElementById(targetId);
+        
+        if (targetEl) {
+          var viewport = targetEl.closest("[class*='overflow-hidden']");
+          if (viewport && window.__emblaInstances) {
+            var embla = window.__emblaInstances.get(viewport);
+            if (embla) {
+              var slides = embla.slideNodes();
+              for (var i = 0; i < slides.length; i++) {
+                if (slides[i] === targetEl || slides[i].contains(targetEl)) {
+                  embla.scrollTo(i);
+                  break;
+                }
+              }
+            }
+          }
+          
+          targetEl.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+            inline: "center",
+          });
+          
+          targetEl.classList.add("evidence-active");
+          setTimeout(function() {
+            targetEl.classList.remove("evidence-active");
+          }, 2000);
+          
+          history.pushState(null, "", "#" + targetId);
+        }
+      });
+    </script>
+
+    <!-- Image Zoom Lightbox -->
+    <script is:inline>
+      (function() {
+        var lightbox = null;
+        var lightboxImg = null;
+        var lastFocusedEl = null;
+
+        function createLightbox() {
+          if (lightbox) return;
+
+          lightbox = document.createElement("div");
+          lightbox.id = "image-lightbox";
+          lightbox.className = "image-lightbox";
+          lightbox.setAttribute("role", "dialog");
+          lightbox.setAttribute("aria-modal", "true");
+          lightbox.setAttribute("aria-label", "이미지 확대 보기");
+          lightbox.innerHTML = 
+            '<div class="image-lightbox__backdrop"></div>' +
+            '<div class="image-lightbox__content">' +
+              '<img class="image-lightbox__img" src="" alt="" />' +
+              '<button type="button" class="image-lightbox__close" aria-label="닫기">' +
+                '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+                  '<line x1="18" y1="6" x2="6" y2="18"></line>' +
+                  '<line x1="6" y1="6" x2="18" y2="18"></line>' +
+                '</svg>' +
+              '</button>' +
+            '</div>';
+          
+          document.body.appendChild(lightbox);
+          lightboxImg = lightbox.querySelector(".image-lightbox__img");
+
+          // Close on backdrop click
+          lightbox.querySelector(".image-lightbox__backdrop").addEventListener("click", closeLightbox);
+          // Close on close button click
+          lightbox.querySelector(".image-lightbox__close").addEventListener("click", closeLightbox);
+          // Close on image click (optional, nice for quick dismiss)
+          lightboxImg.addEventListener("click", closeLightbox);
+        }
+
+        function openLightbox(src, alt) {
+          createLightbox();
+          lightboxImg.src = src;
+          lightboxImg.alt = alt || "";
+          lightbox.classList.add("is-open");
+          document.documentElement.style.overflow = "hidden";
+          // Focus the close button for accessibility
+          setTimeout(function() {
+            lightbox.querySelector(".image-lightbox__close").focus();
+          }, 50);
+        }
+
+        function closeLightbox() {
+          if (!lightbox) return;
+          lightbox.classList.remove("is-open");
+          document.documentElement.style.overflow = "";
+          // Return focus to the element that opened the lightbox
+          if (lastFocusedEl) {
+            lastFocusedEl.focus();
+            lastFocusedEl = null;
+          }
+        }
+
+        // ESC key to close
+        document.addEventListener("keydown", function(e) {
+          if (e.key === "Escape" && lightbox && lightbox.classList.contains("is-open")) {
+            closeLightbox();
+          }
+        });
+
+        // Click listener for zoom targets
+        document.addEventListener("click", function(e) {
+          var zoomEl = e.target.closest("[data-zoom-src]");
+          if (!zoomEl) return;
+
+          e.preventDefault();
+          lastFocusedEl = zoomEl;
+          var src = zoomEl.dataset.zoomSrc;
+          var alt = zoomEl.dataset.zoomAlt || "";
+          openLightbox(src, alt);
+        });
+      })();
+    </script>
+  </body>
+</html>
