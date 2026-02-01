@@ -1,0 +1,203 @@
+---
+slug: graphql-first-step
+title: GraphQL, 한 번은 배워보자 - movieql 개발기
+description: REST에 익숙한 백엔드 개발자가 GraphQL을 처음 접하고 영화 API를 만들어본 이야기
+createdAt: "2022/02/15"
+updatedAt: ""
+tags: ["GraphQL", "Node.js", "학습", "토이프로젝트"]
+featured: false
+image: /blog/graphql-first-step/thumbnail.jpg
+---
+
+NestJS로 REST API를 계속 만들다 보니 문득 궁금해졌다.
+
+"GraphQL이 그렇게 좋다는데, 뭐가 다른 거지?"
+
+주변에서 GraphQL 얘기가 점점 많아졌다. Facebook이 만들었다, Netflix도 쓴다, 프론트엔드 개발자들이 좋아한다... 안 배워보면 뒤처지는 느낌이었다.
+
+## REST vs GraphQL, 뭐가 다른데?
+
+내가 알던 REST API:
+
+```
+GET /movies          → 영화 목록
+GET /movies/1        → 영화 상세
+GET /movies/1/actors → 출연 배우
+```
+
+같은 걸 GraphQL로 하면:
+
+```graphql
+query {
+  movie(id: 1) {
+    title
+    year
+    actors {
+      name
+    }
+  }
+}
+```
+
+한 번의 요청으로 필요한 데이터만 정확히 가져온다. Over-fetching, Under-fetching 문제가 없다.
+
+"오, 이거 진짜 좋은데?"
+
+## 토이 프로젝트: movieql
+
+배우려면 직접 만들어봐야 한다. 영화 데이터를 제공하는 GraphQL API를 만들기로 했다.
+
+### 기술 스택
+
+- **apollo-server**: GraphQL 서버
+- **node-fetch**: 외부 API 호출
+- **YTS API**: 영화 데이터 소스
+
+### 스키마 정의
+
+```graphql
+type Movie {
+  id: Int!
+  title: String!
+  rating: Float!
+  year: Int!
+  genres: [String]!
+  summary: String!
+  medium_cover_image: String!
+}
+
+type Query {
+  movies(limit: Int, rating: Float): [Movie]!
+  movie(id: Int!): Movie
+}
+```
+
+타입을 먼저 정의하고, 그에 맞는 resolver를 작성한다. TypeScript처럼 타입이 명확해서 좋았다.
+
+### Resolver 구현
+
+```javascript
+const resolvers = {
+  Query: {
+    movies: async (_, { limit, rating }) => {
+      const url = `https://yts.mx/api/v2/list_movies.json?limit=${limit}&minimum_rating=${rating}`;
+      const response = await fetch(url);
+      const { data } = await response.json();
+      return data.movies;
+    },
+    movie: async (_, { id }) => {
+      const url = `https://yts.mx/api/v2/movie_details.json?movie_id=${id}`;
+      const response = await fetch(url);
+      const { data } = await response.json();
+      return data.movie;
+    }
+  }
+};
+```
+
+외부 API를 감싸서 GraphQL 인터페이스로 제공한다. BFF(Backend for Frontend) 패턴과 비슷하다.
+
+## 신기했던 점들
+
+### 1. Playground가 내장되어 있다
+
+apollo-server를 띄우면 바로 GraphQL Playground가 생긴다. Postman 없이도 API 테스트가 가능하다.
+
+```bash
+npm start
+# http://localhost:4000 접속하면 Playground!
+```
+
+자동완성, 문서, 히스토리까지. 개발 경험이 좋았다.
+
+### 2. 클라이언트가 데이터를 선택한다
+
+```graphql
+# 목록에서는 제목과 포스터만
+query {
+  movies(limit: 10) {
+    title
+    medium_cover_image
+  }
+}
+
+# 상세에서는 줄거리까지
+query {
+  movie(id: 1) {
+    title
+    summary
+    rating
+    year
+  }
+}
+```
+
+같은 엔드포인트인데 요청에 따라 응답이 달라진다. REST였으면 별도 API를 만들거나 쿼리 파라미터로 제어했을 텐데.
+
+### 3. 타입 시스템의 강력함
+
+스키마가 곧 문서다. 타입이 정의되어 있으니 프론트엔드 개발자가 스키마만 보고 개발할 수 있다.
+
+```graphql
+# rating은 Float, year는 Int
+# 실수할 수가 없다
+type Movie {
+  rating: Float!
+  year: Int!
+}
+```
+
+## 어려웠던 점
+
+### N+1 문제
+
+영화 목록을 가져오면서 각 영화의 배우 정보도 가져오면?
+
+```graphql
+query {
+  movies(limit: 10) {
+    title
+    actors {
+      name
+    }
+  }
+}
+```
+
+영화 10개 + 배우 쿼리 10개 = 11번의 요청.
+
+이걸 해결하려면 DataLoader라는 걸 써야 한다는데, 토이 프로젝트라 거기까진 안 갔다.
+
+### 캐싱이 복잡하다
+
+REST는 HTTP 캐싱이 잘 된다. URL 기반이니까.
+
+GraphQL은 모든 요청이 POST + 같은 엔드포인트라서 HTTP 캐싱이 안 된다. 별도의 캐싱 전략이 필요하다.
+
+## REST vs GraphQL, 결론
+
+둘 다 도구일 뿐, 상황에 맞게 쓰면 된다.
+
+**GraphQL이 좋을 때:**
+- 클라이언트(특히 모바일)가 여러 종류일 때
+- 데이터 요구사항이 다양할 때
+- 프론트엔드 팀이 자율성을 원할 때
+
+**REST가 좋을 때:**
+- 간단한 CRUD
+- 캐싱이 중요할 때
+- 팀에 GraphQL 경험이 없을 때
+
+나는 회사 프로젝트에선 여전히 REST(NestJS)를 쓴다. 하지만 GraphQL을 알게 되니 설계 관점이 넓어졌다.
+
+## 마무리
+
+movieql은 작은 토이 프로젝트지만, GraphQL의 핵심 개념을 이해하는 데 충분했다.
+
+- 스키마 우선 설계
+- 클라이언트 주도 데이터 요청
+- 타입 시스템의 강점
+
+언젠가 실무에서 GraphQL을 쓸 기회가 오면 그때 더 깊이 파보려 한다. 지금은 "GraphQL이 뭔지 안다"는 것만으로도 의미 있다.
+
+GitHub: [movieql](https://github.com/sonbyungjun/movieql)

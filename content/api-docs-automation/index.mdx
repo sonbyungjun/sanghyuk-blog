@@ -1,0 +1,148 @@
+---
+slug: api-docs-automation
+title: API 문서화, 자동화가 답이었다
+description: apidoc으로 Express API 문서를 자동 생성하고 팀 협업을 개선한 이야기
+createdAt: "2020/08/15"
+updatedAt: ""
+tags: ["API", "문서화", "Express", "apidoc", "협업"]
+featured: false
+image: /blog/api-docs-automation/thumbnail.jpg
+---
+
+"이 API 응답 형식이 뭐예요?"
+"그거 지난주에 바뀌었는데..."
+"어디서 확인해요?"
+"제 로컬에서 테스트해보세요."
+
+프론트엔드 개발자와의 대화가 매일 이런 식이었다.
+
+## 문서화의 필요성
+
+Express로 백엔드를 구성하면서 API가 점점 많아졌다. 처음에는 Notion에 수동으로 API 스펙을 정리했다. 엔드포인트, 요청 파라미터, 응답 형식...
+
+문제는 코드가 바뀔 때마다 문서도 같이 업데이트해야 한다는 것이었다. 당연히 그게 안 됐다. 문서와 실제 API는 점점 달라졌고, 결국 "문서 말고 코드를 보세요"가 됐다.
+
+## apidoc을 만나다
+
+여러 문서화 도구를 찾아봤다. Swagger, Postman, apidoc...
+
+당시 팀 상황에 맞는 건 apidoc이었다. 이유는:
+
+1. **주석 기반**: 기존 코드에 주석만 추가하면 됐다
+2. **빌드 과정 단순**: `apidoc -i src/ -o docs/` 한 줄
+3. **학습 곡선 낮음**: 문법이 직관적
+
+## 적용 과정
+
+### 기본 주석 작성
+
+```javascript
+/**
+ * @api {get} /users/:id 사용자 조회
+ * @apiName GetUser
+ * @apiGroup User
+ * @apiVersion 1.0.0
+ *
+ * @apiParam {Number} id 사용자 ID
+ *
+ * @apiSuccess {Number} id 사용자 ID
+ * @apiSuccess {String} name 이름
+ * @apiSuccess {String} email 이메일
+ *
+ * @apiSuccessExample {json} Success-Response:
+ *     HTTP/1.1 200 OK
+ *     {
+ *       "id": 1,
+ *       "name": "홍길동",
+ *       "email": "hong@example.com"
+ *     }
+ */
+router.get('/users/:id', userController.getUser);
+```
+
+### 에러 응답도 문서화
+
+```javascript
+/**
+ * @apiError UserNotFound 사용자를 찾을 수 없음
+ *
+ * @apiErrorExample {json} Error-Response:
+ *     HTTP/1.1 404 Not Found
+ *     {
+ *       "error": "UserNotFound",
+ *       "message": "해당 사용자를 찾을 수 없습니다"
+ *     }
+ */
+```
+
+### 빌드 스크립트 추가
+
+```json
+{
+  "scripts": {
+    "docs": "apidoc -i src/ -o docs/",
+    "docs:watch": "nodemon --exec 'npm run docs' --watch src/"
+  }
+}
+```
+
+## 템플릿화
+
+같은 구조의 프로젝트가 늘어나면서, apidoc 설정을 매번 복사하는 게 귀찮아졌다. 그래서 템플릿을 만들었다.
+
+apidoc.json, 기본 폴더 구조, 에러 응답 템플릿까지 한번에 셋업되는 스타터.
+
+```bash
+git clone https://github.com/sonbyungjun/apidoc-template my-project
+cd my-project
+npm install
+npm run docs
+```
+
+바로 문서화가 적용된 Express 프로젝트가 생성된다.
+
+## 팀에서의 변화
+
+### Before
+- 슬랙에서 API 물어보기 → 백엔드 개발자 작업 중단 → 구두로 설명
+- 문서 없음 → 프론트 개발자가 코드 직접 확인
+- API 변경 → 양쪽 모두 혼란
+
+### After
+- `/docs` 접속해서 확인 → 셀프 서비스
+- 코드 변경 시 주석도 같이 수정 → 문서 자동 동기화
+- PR 리뷰에서 문서 주석도 확인 → 품질 관리
+
+가장 좋았던 건 "문서 어디서 봐요?" 질문이 사라진 것이다.
+
+## 한계점
+
+apidoc을 쓰면서 느낀 한계도 있었다.
+
+1. **주석이 길어짐**: 복잡한 API는 주석이 코드보다 길었다
+2. **타입 안정성 부족**: TypeScript와의 연동이 약함
+3. **실제 테스트 불가**: 문서에서 바로 API 호출을 못 함
+
+이 한계들은 나중에 Swagger로 전환하면서 해결됐다. 하지만 빠르게 문서화 문화를 정착시키는 데는 apidoc이 제격이었다.
+
+## 배운 점
+
+### 1. 자동화가 유지보수의 핵심
+
+수동으로 관리하는 문서는 반드시 outdated된다. 코드와 문서가 같은 곳에 있어야 동기화된다.
+
+### 2. 낮은 진입 장벽이 중요
+
+팀 전체가 써야 의미 있는 도구다. 복잡한 설정 없이 주석만 쓰면 되니까 저항이 적었다.
+
+### 3. 완벽보다 시작
+
+Swagger가 더 좋다는 건 알았다. 하지만 당장 적용하기엔 러닝커브가 있었고, apidoc은 오늘 바로 시작할 수 있었다.
+
+## 마무리
+
+API 문서화는 백엔드 개발자의 책임이자 배려다. 내가 만든 API를 다른 사람이 이해하고 쓸 수 있어야 한다.
+
+apidoc-template은 그 첫걸음을 쉽게 만들어준 도구였다. 지금은 NestJS + Swagger를 쓰지만, 그때의 경험이 "문서화는 필수"라는 마인드셋을 만들어줬다.
+
+GitHub: [apidoc-template](https://github.com/sonbyungjun/apidoc-template)
