@@ -1,0 +1,188 @@
+---
+slug: flutter-first-step
+title: 백엔드 개발자의 Flutter 입문기
+description: React Native 대신 Flutter를 선택한 이유와 첫 보일러플레이트를 만들기까지
+createdAt: "2024/04/10"
+updatedAt: ""
+tags: ["Flutter", "Dart", "모바일", "크로스플랫폼"]
+featured: false
+image: /blog/flutter-first-step/thumbnail.jpg
+---
+
+백엔드 개발자로 5년, 갑자기 앱을 만들어야 했다. 회사에서 기존 네이티브 앱들을 Flutter로 마이그레이션하기로 했고, 백엔드만 하던 내가 앱까지 맡게 됐다.
+
+## 왜 Flutter인가
+
+React Native도 고려했다. React 경험이 있으니 러닝커브가 낮을 거라 생각했다.
+
+하지만 Flutter를 선택한 이유:
+
+1. **성능**: 네이티브 컴파일. JavaScript 브릿지 없음
+2. **UI 일관성**: iOS/Android에서 동일한 UI (픽셀 단위까지)
+3. **핫 리로드**: 코드 수정하면 1초 내로 반영
+4. **회사 방향성**: 이미 다른 팀에서 Flutter 사용 중
+
+## Dart, 생각보다 괜찮다
+
+Flutter를 쓰려면 Dart를 배워야 한다. 처음엔 "왜 새 언어를 배워야 해?"라고 생각했다.
+
+```dart
+// TypeScript 개발자에게 익숙한 문법
+class User {
+  final int id;
+  final String name;
+  final String? email;  // nullable
+
+  User({
+    required this.id,
+    required this.name,
+    this.email,
+  });
+
+  factory User.fromJson(Map<String, dynamic> json) {
+    return User(
+      id: json['id'],
+      name: json['name'],
+      email: json['email'],
+    );
+  }
+}
+```
+
+TypeScript와 비슷하면서도 다르다. `required`, `final` 같은 키워드가 처음엔 어색했지만, 며칠 쓰니 익숙해졌다.
+
+## 첫 번째 벽: 상태 관리
+
+React의 useState, useContext에 익숙했던 나에게 Flutter의 상태 관리는 혼란스러웠다.
+
+```dart
+// StatefulWidget의 기본 상태 관리
+class CounterPage extends StatefulWidget {
+  @override
+  _CounterPageState createState() => _CounterPageState();
+}
+
+class _CounterPageState extends State<CounterPage> {
+  int _count = 0;
+
+  void _increment() {
+    setState(() {
+      _count++;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Text('$_count');
+  }
+}
+```
+
+`setState`로 시작했지만, 앱이 커지니 한계가 왔다. 결국 Riverpod을 도입했다.
+
+```dart
+// Riverpod으로 깔끔해진 상태 관리
+final counterProvider = StateProvider<int>((ref) => 0);
+
+class CounterPage extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final count = ref.watch(counterProvider);
+    return Text('$count');
+  }
+}
+```
+
+React의 Recoil이나 Jotai랑 비슷한 느낌이다.
+
+## 보일러플레이트 만들기
+
+비슷한 구조의 앱을 여러 개 만들다 보니, 매번 같은 설정을 반복하고 있었다. 그래서 보일러플레이트를 만들었다.
+
+포함된 것들:
+- **폴더 구조**: feature 기반 구조
+- **Riverpod**: 상태 관리
+- **Dio**: HTTP 클라이언트
+- **go_router**: 라우팅
+- **flutter_secure_storage**: 토큰 저장
+- **환경 설정**: dev/staging/prod 분리
+
+```
+lib/
+├── core/
+│   ├── config/
+│   ├── network/
+│   ├── storage/
+│   └── utils/
+├── features/
+│   ├── auth/
+│   │   ├── data/
+│   │   ├── domain/
+│   │   └── presentation/
+│   └── home/
+├── shared/
+│   ├── widgets/
+│   └── providers/
+└── main.dart
+```
+
+Clean Architecture를 참고했지만, 너무 엄격하게 따르진 않았다. 실용성이 우선이다.
+
+## API 연동 패턴
+
+백엔드 개발자라서 API 연동은 자신 있었다. NestJS에서 만든 API를 Flutter에서 호출하는 건 어렵지 않았다.
+
+```dart
+class ApiClient {
+  final Dio _dio;
+
+  ApiClient(this._dio) {
+    _dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) async {
+          final token = await _storage.getToken();
+          if (token != null) {
+            options.headers['Authorization'] = 'Bearer $token';
+          }
+          return handler.next(options);
+        },
+        onError: (error, handler) async {
+          if (error.response?.statusCode == 401) {
+            // 토큰 갱신 로직
+            await _refreshToken();
+            return handler.resolve(await _retry(error.requestOptions));
+          }
+          return handler.next(error);
+        },
+      ),
+    );
+  }
+}
+```
+
+Dio의 인터셉터는 Axios와 거의 똑같다. 토큰 갱신, 에러 핸들링 패턴도 익숙했다.
+
+## 백엔드 개발자의 강점
+
+앱 개발을 하면서 백엔드 경험이 도움 된 부분:
+
+1. **API 설계 이해**: 어떤 데이터가 어떻게 올지 예측 가능
+2. **에러 핸들링**: 네트워크 에러, 타임아웃 등 처리 경험
+3. **인증 플로우**: JWT, OAuth 등 이미 알고 있음
+4. **디버깅**: API 문제인지 앱 문제인지 빠르게 파악
+
+반면 어려웠던 부분:
+
+1. **UI/UX**: 버튼 위치, 애니메이션 같은 감각 부족
+2. **반응형 레이아웃**: 다양한 화면 크기 대응
+3. **플랫폼별 차이**: iOS/Android의 미묘한 차이들
+
+## 마무리
+
+3개월 정도 Flutter를 하면서 느낀 건, 생각보다 진입장벽이 낮다는 것이다. 특히 TypeScript 경험이 있다면 Dart는 금방 적응할 수 있다.
+
+백엔드 개발자가 앱까지 할 수 있으면, 혼자서 MVP를 빠르게 만들 수 있다. 사이드 프로젝트를 할 때 특히 유용하다.
+
+다음엔 Flutter 앱 배포 과정을 정리해볼 예정이다. App Store, Play Store 배포는 또 다른 세계였다.
+
+GitHub: [flutter_boilerplate](https://github.com/rightcode1/flutter_boilerplate)
