@@ -45,9 +45,11 @@ export class RoomController {
 
 타입 덕분에 IDE 자동완성이 잘 된다. 리팩토링할 때 컴파일러가 잡아준다.
 
+![](./01-typescript.jpg)
+
 ---
 
-## 2. 구조 강제가 오히려 편하다
+## 2. 구조 강제가 오히러 편하다
 
 Express의 자유로움이 장점이었다. 근데 프로젝트가 많아지니까 문제가 생겼다.
 
@@ -80,6 +82,8 @@ src/v1/room/
 ```
 
 모든 프로젝트가 같은 구조다. 새 프로젝트 들어가도 바로 파악된다.
+
+![](./02-structure.jpg)
 
 ---
 
@@ -119,6 +123,8 @@ async create(@Body() roomDto: CreateRoomRequestDto) { ... }
 ```
 
 JSDoc 주석 vs 데코레이터. 데코레이터가 코드와 더 붙어있어서 관리하기 편하다.
+
+![](./03-decorator.jpg)
 
 ---
 
@@ -196,6 +202,8 @@ const module = await Test.createTestingModule({
   ],
 }).compile();
 ```
+
+![](./04-di.jpg)
 
 ---
 
