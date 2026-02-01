@@ -1,0 +1,132 @@
+---
+slug: nas-telegram-bot
+title: 시놀로지 NAS 자동화 - 텔레그램 봇 만들기
+description: 집에서 굴리는 NAS를 텔레그램으로 제어하는 봇을 만든 이야기
+createdAt: "2019/09/15"
+updatedAt: ""
+tags: ["NAS", "텔레그램", "자동화", "사이드프로젝트"]
+featured: false
+image: /blog/nas-telegram-bot/thumbnail.jpg
+---
+
+시놀로지 NAS를 사용하면서 가장 불편했던 점은 외부에서 접근하려면 매번 웹 브라우저를 열어야 한다는 것이었다. DSM 웹 인터페이스가 아무리 잘 만들어져 있어도, 스마트폰에서 간단한 작업을 하려면 번거로웠다.
+
+그래서 텔레그램 봇을 만들기로 했다.
+
+## 왜 텔레그램인가
+
+카카오톡이나 슬랙도 봇을 지원하지만, 텔레그램을 선택한 이유는 명확했다.
+
+- **무료 API**: 별도 비용 없이 봇 생성 가능
+- **쉬운 봇 생성**: @BotFather로 몇 분 만에 봇 토큰 발급
+- **웹훅 지원**: 서버 없이도 Long Polling으로 동작 가능
+- **풍부한 기능**: 인라인 키보드, 파일 전송 등
+
+## 첫 번째 시도 - Java
+
+당시 학원에서 Java를 배우고 있었기 때문에, 자연스럽게 Java로 시작했다.
+
+```java
+public class TelegramBot extends TelegramLongPollingBot {
+    @Override
+    public void onUpdateReceived(Update update) {
+        if (update.hasMessage() && update.getMessage().hasText()) {
+            String messageText = update.getMessage().getText();
+            long chatId = update.getMessage().getChatId();
+            
+            if (messageText.equals("/status")) {
+                sendMessage(chatId, getNasStatus());
+            }
+        }
+    }
+}
+```
+
+TelegramBots 라이브러리를 사용해서 기본적인 봇은 금방 만들었다. 하지만 문제가 있었다.
+
+## 문제점
+
+1. **NAS에서 Java 실행의 번거로움**: JVM을 NAS에 설치하고 관리하는 게 생각보다 귀찮았다
+2. **리소스 사용량**: 단순한 봇 치고 메모리를 너무 많이 먹었다
+3. **배포의 어려움**: jar 파일 만들고 옮기고... 번거로웠다
+
+## 두 번째 시도 - TypeScript로 리팩토링
+
+결국 TypeScript로 다시 작성했다. Node.js는 NAS에서 Docker로 쉽게 돌릴 수 있었다.
+
+```typescript
+import TelegramBot from 'node-telegram-bot-api';
+
+const bot = new TelegramBot(process.env.TELEGRAM_TOKEN, { polling: true });
+
+bot.onText(/\/torrent (.+)/, async (msg, match) => {
+  const chatId = msg.chat.id;
+  const magnetLink = match[1];
+  
+  try {
+    await addTorrentToDownloadStation(magnetLink);
+    bot.sendMessage(chatId, '토렌트 추가 완료!');
+  } catch (error) {
+    bot.sendMessage(chatId, '추가 실패: ' + error.message);
+  }
+});
+```
+
+## 구현한 기능들
+
+### 1. Download Station 연동
+
+마그넷 링크를 보내면 자동으로 다운로드 시작:
+
+```typescript
+async function addTorrentToDownloadStation(magnetLink: string) {
+  const response = await axios.post(`${NAS_URL}/webapi/DownloadStation/task.cgi`, {
+    api: 'SYNO.DownloadStation.Task',
+    version: 1,
+    method: 'create',
+    uri: magnetLink,
+    _sid: sessionId
+  });
+  return response.data;
+}
+```
+
+### 2. 디스크 상태 확인
+
+```typescript
+bot.onText(/\/disk/, async (msg) => {
+  const status = await getDiskStatus();
+  const message = status.volumes.map(v => 
+    `📁 ${v.name}: ${v.used}/${v.total} (${v.percentage}%)`
+  ).join('\n');
+  bot.sendMessage(msg.chat.id, message);
+});
+```
+
+### 3. 서비스 재시작
+
+Docker 컨테이너나 패키지 서비스를 원격으로 재시작할 수 있게 했다.
+
+## 배운 점
+
+이 프로젝트를 하면서 몇 가지를 배웠다.
+
+**1. 적절한 기술 선택의 중요성**
+
+익숙한 기술이 항상 최선은 아니다. Java로 시작했지만, 이 유즈케이스에는 Node.js가 더 적합했다. 가벼운 봇에 JVM은 과했다.
+
+**2. 시놀로지 API의 강력함**
+
+DSM의 Web API가 생각보다 잘 되어 있었다. 공식 문서는 부실하지만, 웹 인터페이스의 네트워크 탭을 보면서 역공학(?)하면 대부분의 기능을 구현할 수 있었다.
+
+**3. 자동화의 가치**
+
+한번 만들어두니 정말 편했다. 출퇴근길에 폰으로 링크 하나 보내면 집에 도착했을 때 다운로드가 끝나 있다.
+
+## 마무리
+
+이 프로젝트는 나중에 torrentBot이라는 별도 프로젝트로 분리해서 좀 더 다듬었다. 시놀로지 NAS를 사용하는 분들께 추천하는 사이드 프로젝트다.
+
+코드는 GitHub에 공개해두었다:
+- [telegrambot](https://github.com/sonbyungjun/telegrambot)
+- [torrentBot](https://github.com/sonbyungjun/torrentBot)
