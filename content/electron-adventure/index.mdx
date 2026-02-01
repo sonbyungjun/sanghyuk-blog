@@ -1,0 +1,327 @@
+---
+slug: electron-adventure
+title: 백엔드 개발자의 데스크톱 앱 도전기
+description: Electron으로 데스크톱 앱을 만들어보려다 실패한 이야기
+createdAt: "2021/10/20"
+updatedAt: ""
+tags: ["Electron", "TypeScript", "회고", "실패"]
+featured: false
+image: /blog/electron-adventure/thumbnail.jpg
+---
+
+## 데스크톱 앱이 만들고 싶었다
+
+2020년 10월, 회사 업무 중에 반복 작업이 있었다.
+
+1. 특정 폴더의 이미지 파일 확인
+2. 이미지 리사이즈
+3. 메타데이터 추가
+4. 서버에 업로드
+
+매번 CLI로 했다. 귀찮았다.
+
+"GUI로 만들면 편하지 않을까?"
+
+---
+
+## 기술 선택
+
+데스크톱 앱을 만들려면 뭘 써야 할까?
+
+### 후보들
+
+- **Qt (C++)** - 네이티브, 성능 좋음, 근데 C++...
+- **Swift (macOS)** - 맥 전용, Windows 안 됨
+- **C# (WPF)** - Windows 전용, 맥 안 됨
+- **Electron** - JavaScript/TypeScript, 크로스 플랫폼
+
+백엔드 개발자인 나에게 선택지는 하나였다.
+
+**Electron.**
+
+JavaScript로 데스크톱 앱을 만들 수 있다니, 신세계였다.
+
+---
+
+## 첫인상
+
+```bash
+npx create-electron-app my-app --template=typescript
+cd my-app
+npm start
+```
+
+5분 만에 데스크톱 앱이 떴다.
+
+창이 나타나고, 개발자 도구도 열린다. 브라우저처럼 생겼다.
+
+"이거 생각보다 쉬운데?"
+
+---
+
+## 기본 구조 파악
+
+Electron은 두 개의 프로세스로 나뉜다.
+
+### Main Process
+
+Node.js가 돌아가는 곳. 파일 시스템 접근, 창 관리 등.
+
+```typescript
+// main.ts
+import { app, BrowserWindow } from 'electron';
+
+function createWindow() {
+  const win = new BrowserWindow({
+    width: 800,
+    height: 600,
+    webPreferences: {
+      nodeIntegration: true,
+    },
+  });
+
+  win.loadFile('index.html');
+}
+
+app.whenReady().then(createWindow);
+```
+
+### Renderer Process
+
+브라우저가 돌아가는 곳. HTML, CSS, JavaScript로 UI 구현.
+
+```html
+<!-- index.html -->
+<!DOCTYPE html>
+<html>
+  <body>
+    <h1>이미지 업로더</h1>
+    <input type="file" id="fileInput" />
+    <button id="uploadBtn">업로드</button>
+  </body>
+</html>
+```
+
+웹 개발과 똑같다!
+
+---
+
+## 개발 시작
+
+이틀 동안 기본 기능을 만들었다.
+
+### 파일 선택
+
+```typescript
+// renderer.ts
+const fileInput = document.getElementById('fileInput') as HTMLInputElement;
+
+fileInput.addEventListener('change', (e) => {
+  const files = (e.target as HTMLInputElement).files;
+  if (files) {
+    Array.from(files).forEach((file) => {
+      console.log(file.name, file.size);
+    });
+  }
+});
+```
+
+### 이미지 리사이즈
+
+```typescript
+// main.ts - sharp 라이브러리 사용
+import sharp from 'sharp';
+
+async function resizeImage(inputPath: string, outputPath: string) {
+  await sharp(inputPath)
+    .resize(800, 600, { fit: 'inside' })
+    .toFile(outputPath);
+}
+```
+
+### Main-Renderer 통신
+
+```typescript
+// main.ts
+ipcMain.handle('resize-image', async (event, { inputPath, outputPath }) => {
+  await resizeImage(inputPath, outputPath);
+  return { success: true };
+});
+
+// renderer.ts
+const result = await ipcRenderer.invoke('resize-image', {
+  inputPath: '/path/to/input.jpg',
+  outputPath: '/path/to/output.jpg',
+});
+```
+
+---
+
+## 문제 시작
+
+여기까지는 순탄했다. 문제는 그 다음부터.
+
+### 문제 1: 패키징
+
+개발 환경에선 잘 돌아간다. 근데 패키징하면?
+
+```bash
+npm run make
+```
+
+에러의 향연.
+
+```
+Error: Cannot find module 'sharp'
+```
+
+네이티브 모듈은 플랫폼별로 빌드해야 한다. Windows에서 빌드한 sharp는 macOS에서 안 돌아간다.
+
+```bash
+npm rebuild --platform=darwin
+npm rebuild --platform=win32
+```
+
+이걸 CI/CD에서 자동화해야 했다.
+
+### 문제 2: 자동 업데이트
+
+앱 배포 후 업데이트는 어떻게?
+
+```typescript
+// electron-updater 설정
+import { autoUpdater } from 'electron-updater';
+
+autoUpdater.checkForUpdatesAndNotify();
+```
+
+근데 이걸 쓰려면:
+- 코드 서명 인증서 (유료)
+- 업데이트 서버 구축
+- 버전 관리
+
+개인 프로젝트치고 너무 복잡했다.
+
+### 문제 3: 파일 용량
+
+번들 결과물을 보니:
+
+```
+my-app-1.0.0.dmg - 156MB
+```
+
+156MB? 이미지 몇 개 리사이즈하는 앱이?
+
+Electron은 Chromium을 통째로 포함한다. 그게 150MB다.
+
+---
+
+## 결국 포기
+
+이틀간의 삽질 끝에 결론을 내렸다.
+
+**Electron은 내 유스케이스에 오버킬이다.**
+
+목적: 이미지 리사이즈 + 업로드
+현실: Chromium 브라우저 통째로 패키징
+
+---
+
+## 대안
+
+결국 다른 방법을 찾았다.
+
+### 선택 1: CLI 도구
+
+```bash
+#!/bin/bash
+# 이미지 리사이즈 + 업로드 스크립트
+for file in ./images/*; do
+  convert "$file" -resize 800x600 "resized_$file"
+  curl -F "file=@resized_$file" https://api.example.com/upload
+done
+```
+
+가장 심플한 해결책.
+
+### 선택 2: 웹 앱
+
+결국 웹 앱으로 만들었다. 브라우저에서 파일 드래그 앤 드롭.
+
+```typescript
+// 웹에서도 이미지 리사이즈 가능
+const canvas = document.createElement('canvas');
+const ctx = canvas.getContext('2d');
+// ... 리사이즈 로직
+```
+
+별도 설치 없이 브라우저만 있으면 된다.
+
+---
+
+## 배운 점
+
+### 1. 도구는 문제에 맞게
+
+Electron은 좋은 기술이다. VS Code, Slack, Discord가 Electron으로 만들어졌다.
+
+하지만 내 문제에는 맞지 않았다.
+
+간단한 유틸리티 → 스크립트나 CLI
+복잡한 데스크톱 앱 → Electron
+
+### 2. 웹 기술의 한계
+
+JavaScript로 모든 걸 할 수 있다는 게 장점이자 단점이다.
+
+네이티브 모듈 의존성, 패키징 복잡도, 파일 크기...
+
+"웹 기술로 데스크톱 앱"의 대가가 있다.
+
+### 3. 실패도 경험
+
+이틀 동안 Electron을 만져봤다. 결과물은 없지만:
+
+- Electron 아키텍처 이해
+- IPC 통신 패턴
+- 네이티브 모듈 빌드 문제
+
+나중에 필요하면 다시 도전할 수 있다.
+
+---
+
+## Electron이 적합한 경우
+
+그렇다고 Electron이 나쁜 건 아니다. 이럴 때 쓰면 좋다:
+
+- **복잡한 UI가 필요할 때** - 웹 기술로 빠르게 개발
+- **크로스 플랫폼이 필수일 때** - 한 코드로 Windows, macOS, Linux
+- **웹 앱을 데스크톱으로 포팅할 때** - 기존 코드 재사용
+- **팀에 웹 개발자가 많을 때** - 러닝 커브 최소화
+
+---
+
+## 마무리
+
+백엔드 개발자가 데스크톱 앱에 도전한 이틀.
+
+결과는 실패지만, 후회는 없다.
+
+새로운 영역을 탐험해봤고, 내 문제에 맞는 도구가 뭔지 알게 됐다.
+
+**때로는 삽질이 최고의 스승이다.**
+
+```
+GitHub 커밋 로그:
+2020-10-13: project init
+2020-10-14: 타입스크립트 적용
+(그 후 커밋 없음)
+```
+
+짧았지만 강렬했던 Electron과의 만남.
+
+다음엔 더 준비해서 도전해보자.
+
+---
+
+*다음 글: [cucu-generator 개발기](/blog/cucu-generator)*
