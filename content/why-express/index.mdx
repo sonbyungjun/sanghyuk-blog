@@ -1,0 +1,227 @@
+---
+slug: why-express
+title: 왜 Express를 선택했나
+description: 신입 개발자가 첫 백엔드 프레임워크로 Express를 선택한 이유
+createdAt: "2020/01/15"
+updatedAt: ""
+tags: ["백엔드", "Node.js", "Express", "회고"]
+featured: true
+---
+
+## 들어가며
+
+첫 회사에서 백엔드를 맡게 됐다. 사수도 없고, 프레임워크 선택부터 내 몫이었다.
+
+Java Spring, Python Django, Node.js Express... 선택지는 많았다. 결국 Express를 선택했고, 3개월이 지난 지금 그 선택이 틀리지 않았다고 생각한다.
+
+왜 Express였을까?
+
+---
+
+## 1. 제로초 강의의 영향
+
+솔직히 말하면, 처음엔 "강의가 있어서"였다.
+
+제로초님의 Node.js 강의가 체계적이었고, Express 기반이었다. 사수 없이 혼자 배워야 하는 상황에서 검증된 강의가 있다는 건 큰 장점이었다.
+
+```javascript
+const express = require('express');
+const app = express();
+
+app.get('/', (req, res) => {
+  res.send('Hello World');
+});
+
+app.listen(3000);
+```
+
+이 몇 줄로 서버가 뜬다. 진입장벽이 낮았다.
+
+---
+
+## 2. JavaScript 하나로 풀스택
+
+프론트엔드도 JavaScript, 백엔드도 JavaScript.
+
+언어를 하나만 깊게 파면 된다는 게 매력적이었다. 특히 혼자 개발하는 상황에서 언어 전환 비용이 없다는 건 생산성에 직결됐다.
+
+```javascript
+// 프론트엔드에서 쓰던 문법 그대로
+const users = await User.findAll();
+const filtered = users.filter(u => u.isActive);
+const mapped = filtered.map(u => ({ id: u.id, name: u.name }));
+```
+
+---
+
+## 3. 미들웨어 패턴의 단순함
+
+Express의 핵심은 미들웨어다. 요청이 들어오면 미들웨어를 순서대로 통과한다.
+
+```javascript
+// 로깅 → 인증 → 검증 → 컨트롤러
+app.use(morgan('dev'));
+app.use(passport.initialize());
+
+router.post(
+  '/board/register',
+  loginCheck(false),           // 인증 미들웨어
+  validator.body(boardSchema), // 검증 미들웨어
+  boardController.create       // 컨트롤러
+);
+```
+
+이 패턴이 직관적이었다. 코드 흐름이 눈에 보였다.
+
+---
+
+## 4. 구조를 내 맘대로
+
+Express는 구조를 강제하지 않는다. 처음엔 이게 단점처럼 느껴졌는데, 오히려 장점이었다.
+
+Java Spring 구조를 떠올리며 내 방식대로 폴더를 나눴다:
+
+```
+src/
+├── routes/
+│   └── board/
+│       ├── board.route.js      # 라우팅 + Swagger
+│       ├── board.controller.js # 요청/응답 처리
+│       ├── board.service.js    # 비즈니스 로직
+│       ├── board.schema.js     # Joi 검증 스키마
+│       └── board.model.js      # Sequelize 모델
+├── models/                     # 전역 모델
+├── passport/                   # 인증 전략
+└── utils/                      # 유틸리티
+```
+
+프레임워크가 정해준 구조가 아니라, 내가 이해하고 만든 구조라서 유지보수가 편했다.
+
+---
+
+## 5. Sequelize와의 조합
+
+ORM으로 Sequelize를 선택했다. Express와 궁합이 좋았다.
+
+```javascript
+// 모델 정의
+const Board = sequelize.define('board', {
+  title: DataTypes.STRING,
+  content: DataTypes.TEXT,
+  viewCount: { type: DataTypes.INTEGER, defaultValue: 0 }
+});
+
+// 관계 설정
+Board.belongsTo(User);
+Board.hasMany(BoardImage);
+
+// 쿼리
+const board = await Board.findOne({
+  where: { id },
+  include: [
+    { model: User, attributes: ['name'] },
+    { model: BoardImage }
+  ]
+});
+```
+
+SQL을 직접 쓰지 않아도 됐고, 마이그레이션 관리도 편했다.
+
+---
+
+## 6. Swagger 문서화
+
+API 문서는 swagger-jsdoc으로 해결했다.
+
+```javascript
+/**
+ * @swagger
+ * /board/register:
+ *   post:
+ *     tags: [board]
+ *     summary: (권한 - 로그인) 게시판 등록
+ *     parameters:
+ *       - in: header
+ *         name: authorization
+ *         description: bearer token
+ *       - in: body
+ *         name: body
+ *         schema:
+ *           $ref: '#/definitions/board'
+ *     responses:
+ *       200:
+ *         description: 성공
+ */
+router.post('/board/register', ...);
+```
+
+JSDoc 주석으로 문서가 자동 생성됐다. 프론트엔드 개발자와 협업할 때 유용했다.
+
+---
+
+## 7. 검증은 Joi로
+
+요청 데이터 검증은 Joi + express-joi-validation 조합을 썼다.
+
+```javascript
+const Joi = require('@hapi/joi');
+
+const boardSchema = Joi.object({
+  title: Joi.string().required(),
+  content: Joi.string().required(),
+  images: Joi.array().items(Joi.string())
+});
+
+// 라우트에서 사용
+router.post(
+  '/board/register',
+  validator.body(boardSchema),
+  boardController.create
+);
+```
+
+스키마만 정의하면 검증은 미들웨어가 알아서 해줬다.
+
+---
+
+## 8. npm 생태계
+
+뭔가 필요하면 npm에 다 있었다.
+
+```json
+{
+  "dependencies": {
+    "express": "^4.17.1",
+    "sequelize": "^5.19.6",
+    "passport": "^0.4.0",
+    "passport-jwt": "^4.0.0",
+    "jsonwebtoken": "^8.5.1",
+    "firebase-admin": "^8.6.1",
+    "multer-s3": "^2.9.0",
+    "swagger-jsdoc": "^3.4.0",
+    "socket.io": "^2.3.0"
+  }
+}
+```
+
+인증, 파일 업로드, 푸시 알림, 실시간 통신... 패키지 설치하고 붙이면 됐다.
+
+---
+
+## 돌아보며
+
+Express를 선택한 이유를 정리하면:
+
+1. **강의가 있었다** - 혼자 배우기 좋았음
+2. **진입장벽이 낮았다** - 빠르게 시작할 수 있었음
+3. **JavaScript 통일** - 언어 전환 비용 없음
+4. **유연한 구조** - 내 방식대로 설계 가능
+5. **거대한 생태계** - 필요한 건 다 있음
+
+물론 단점도 있다. TypeScript 지원이 아쉽고, 구조를 강제하지 않아서 팀 프로젝트에서는 컨벤션 맞추기가 힘들 수 있다.
+
+하지만 신입이 혼자 빠르게 백엔드를 구축해야 하는 상황에서, Express는 좋은 선택이었다.
+
+---
+
+*다음 글에서는 4년 후 NestJS로 전환한 이야기를 다룰 예정이다.*
