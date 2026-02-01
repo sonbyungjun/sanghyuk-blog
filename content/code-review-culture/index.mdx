@@ -1,0 +1,203 @@
+---
+slug: code-review-culture
+title: 코드 리뷰, 처음엔 무서웠다
+description: 1인 개발에서 팀 개발로, 코드 리뷰 문화를 정착시킨 이야기
+createdAt: "2023/07/10"
+updatedAt: ""
+tags: ["코드리뷰", "팀문화", "협업", "성장", "회고"]
+featured: true
+image: /blog/code-review-culture/thumbnail.jpg
+---
+
+처음 코드 리뷰를 받았을 때 기분이 이상했다.
+
+"이 변수명은 의도를 잘 드러내지 않는 것 같아요."
+
+머리로는 맞는 말인 걸 안다. 근데 속으론 "내 코드 뭐 어쨌다고?"라는 생각이 스쳤다.
+
+## 1인 개발의 습관
+
+2019년부터 3년 반 동안 대부분 혼자 개발했다. 사수 없이 시작해서 혼자 결정하고 혼자 구현했다.
+
+좋았던 점도 있다. 빠르게 결정하고 빠르게 움직일 수 있었다.
+
+근데 문제가 있었다.
+
+- 내 코드가 객관적으로 어떤지 모른다
+- "이게 최선인가?"에 대한 피드백이 없다
+- 나쁜 습관이 고착된다
+
+2023년 초, 팀원이 늘어나면서 코드 리뷰를 시작하게 됐다.
+
+## 처음엔 힘들었다
+
+### 방어적이 된다
+
+```
+리뷰어: 이 함수가 너무 많은 일을 하는 것 같아요. 분리하면 어떨까요?
+
+나: (속으로) 이게 왜 문제지? 잘 돌아가는데...
+```
+
+내 코드 = 나라는 생각. 코드 지적이 인격 지적처럼 느껴졌다.
+
+### 시간이 오래 걸린다
+
+"이거 빨리 배포해야 하는데 리뷰 기다리느라..."
+
+급한 건 일단 머지하고 나중에 리뷰받자는 생각이 계속 들었다.
+
+### 뭘 봐야 하는지 모르겠다
+
+남의 PR을 리뷰해야 하는데, "이게 맞는 건가?"를 판단하기 어려웠다.
+
+"LGTM"만 달고 넘어가는 날이 많았다.
+
+## 전환점
+
+어느 날 시니어 개발자분이 내 PR에 이런 리뷰를 달았다.
+
+```typescript
+// Before: 내 코드
+const getUserOrderHistory = async (userId: string) => {
+  const user = await userRepo.findOne(userId);
+  if (!user) throw new Error('User not found');
+  const orders = await orderRepo.find({ userId });
+  const filtered = orders.filter(o => o.status !== 'CANCELLED');
+  const sorted = filtered.sort((a, b) => b.createdAt - a.createdAt);
+  return sorted.map(o => ({
+    orderId: o.id,
+    amount: o.totalAmount,
+    date: o.createdAt
+  }));
+};
+```
+
+리뷰 코멘트:
+> "이 함수가 유저 조회 → 주문 조회 → 필터링 → 정렬 → 매핑을 다 하고 있네요.
+> 각각을 분리하면 테스트도 쉽고 재사용도 가능해질 것 같아요."
+
+```typescript
+// After: 리뷰 반영
+const getActiveOrders = (orders: Order[]) =>
+  orders.filter(o => o.status !== 'CANCELLED');
+
+const sortByLatest = (orders: Order[]) =>
+  [...orders].sort((a, b) => b.createdAt - a.createdAt);
+
+const toOrderSummary = (order: Order): OrderSummary => ({
+  orderId: order.id,
+  amount: order.totalAmount,
+  date: order.createdAt,
+});
+
+const getUserOrderHistory = async (userId: string) => {
+  await this.validateUser(userId);
+  const orders = await orderRepo.find({ userId });
+  return sortByLatest(getActiveOrders(orders)).map(toOrderSummary);
+};
+```
+
+코드가 깔끔해진 게 눈에 보였다. "아, 이래서 리뷰를 받는구나."
+
+## 우리 팀의 코드 리뷰 규칙
+
+몇 달간 시행착오 끝에 정리한 규칙들:
+
+### 1. PR은 작게
+
+300줄 넘으면 리뷰어가 힘들다. 피처 하나, 버그 하나씩 쪼개서 올린다.
+
+### 2. 의도를 설명한다
+
+```markdown
+## 이 PR의 목적
+- 결제 실패 시 재시도 로직 추가
+- 최대 3회까지 재시도, 그 이후엔 수동 처리 대기열로 이동
+
+## 변경 사항
+- PaymentService에 retry 로직 추가
+- PaymentStatus에 PENDING_MANUAL_REVIEW 추가
+
+## 테스트
+- [ ] 재시도 성공 케이스
+- [ ] 3회 실패 후 대기열 이동
+```
+
+이게 있으면 리뷰어가 "왜 이렇게 했지?"를 덜 묻는다.
+
+### 3. 리뷰는 24시간 내에
+
+PR이 오래 묵히면 컨텍스트가 날아간다. 당일 리뷰가 제일 좋고, 늦어도 다음 날까지.
+
+### 4. 코드가 아닌 접근을 리뷰한다
+
+"이 줄 인덴트 틀렸어요" 같은 건 린터에게 맡긴다.
+
+사람은 "이 로직이 엣지 케이스를 다 커버하나?", "이 설계가 확장 가능한가?"를 본다.
+
+### 5. 칭찬도 한다
+
+```
+👍 이 부분 추상화 좋네요!
+💡 오, 이런 방법이 있었군요. 배워갑니다.
+```
+
+지적만 하면 리뷰받기 무서워진다.
+
+## 코드 리뷰로 바뀐 것들
+
+### 코드 품질
+
+혼자 짤 땐 "일단 돌아가면 되지"였다. 이제는 "누군가 이걸 볼 텐데"라고 생각하며 짠다.
+
+변수명 신경 쓰고, 함수 분리하고, 주석 달고. 리뷰 지적받기 전에 스스로 고치게 된다.
+
+### 지식 공유
+
+```
+리뷰어: 여기 Optional Chaining 쓰면 더 깔끔해질 것 같아요.
+        user?.address?.city ?? 'Unknown'
+
+나: 오 이런 문법이 있었군요!
+```
+
+한 사람이 알던 걸 팀 전체가 알게 된다. 개인의 성장이 팀의 성장으로.
+
+### 버스 팩터 해결
+
+예전엔 내가 짠 코드는 나만 알았다. 내가 휴가 가면 아무도 못 건드렸다.
+
+이제 최소 한 명은 내 코드를 이해하고 있다. 리뷰를 받았으니까.
+
+## 리뷰를 잘 하는 법 (내 기준)
+
+### 질문으로 시작한다
+
+❌ "이 코드 잘못됐어요."
+✅ "이 경우엔 어떻게 동작하나요?"
+
+단정보다 질문이 덜 공격적이다.
+
+### 대안을 제시한다
+
+❌ "이 방식은 별로예요."
+✅ "이런 방식은 어떨까요? (코드 예시)"
+
+까기만 하면 기분 나쁘다. 대안이 있어야 건설적이다.
+
+### 사소한 건 넘어간다
+
+인덴트 1칸 차이, 세미콜론 유무... 이런 건 린터가 잡게 하고 넘어간다.
+
+사람의 에너지는 중요한 데 쓰자.
+
+## 결론
+
+코드 리뷰, 처음엔 내 부족함을 드러내는 것 같아서 무서웠다.
+
+지금은 다르게 본다. 리뷰는 "내 코드를 더 좋게 만들어주는 과정"이다.
+
+혼자 짜던 시절로 돌아가고 싶지 않다. 누군가 봐주는 게 있다는 건 큰 안전망이다.
+
+"내 코드"가 아니라 "우리 코드"가 되는 과정. 그게 코드 리뷰인 것 같다.

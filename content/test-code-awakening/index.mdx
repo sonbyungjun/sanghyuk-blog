@@ -1,0 +1,175 @@
+---
+slug: test-code-awakening
+title: 테스트 코드, 그거 왜 해야 돼요?
+description: "나중에 짜지 뭐"라던 내가 테스트를 먼저 짜게 된 이유
+createdAt: "2022/10/15"
+updatedAt: ""
+tags: ["테스트", "Jest", "TDD", "NestJS", "회고"]
+featured: true
+image: /blog/test-code-awakening/thumbnail.jpg
+---
+
+"테스트 코드 없어도 잘 돌아가는데요?"
+
+3년 동안 이렇게 말하고 다녔다. 시간 없다, 바쁘다, 이거 급하다. 핑계는 많았다.
+
+그러다 터졌다.
+
+## 그 날의 장애
+
+2022년 9월 어느 금요일 오후 5시. 배포 직후였다.
+
+```
+[ERROR] TypeError: Cannot read property 'userId' of undefined
+```
+
+결제 API가 터졌다. 프론트엔드에서 넘어오는 데이터 구조가 바뀌었는데, 백엔드에서 확인을 안 한 거다.
+
+"테스트 돌려보셨어요?"
+"아... 그게..."
+
+테스트가 없었다. 정확히는, 작성하다 말다 한 테스트 파일들만 덩그러니 있었다.
+
+## 왜 안 썼나
+
+### 1. 시간이 없다는 착각
+
+"기능 개발하기도 바쁜데 테스트까지?"
+
+일정에 쫓기면 제일 먼저 삭제되는 게 테스트였다. 어차피 QA 팀에서 확인하잖아.
+
+### 2. 뭘 테스트해야 하는지 모름
+
+Controller를 테스트해? Service를? DB 연결도 해야 해?
+
+용어도 어려웠다. Unit test, Integration test, E2E test... 다 다르다는데 뭐부터 해야 할지 감이 안 왔다.
+
+### 3. 테스트 짜는 게 더 어려움
+
+실제 로직은 10줄인데 테스트 코드가 50줄. mocking, stubbing, fixture... 처음 보는 개념들.
+
+"이거 테스트 짜는 시간에 기능 하나 더 만들겠다"고 생각했다.
+
+## 장애 이후 달라진 것
+
+### 테스트 커버리지 80% 목표
+
+팀 회의 후 결정됐다. 신규 코드는 무조건 테스트를 작성한다.
+
+처음엔 귀찮았다. 근데 2주쯤 지나니까 습관이 됐다.
+
+```typescript
+// 이제 이런 코드를 먼저 짠다
+describe('PaymentService', () => {
+  describe('processPayment', () => {
+    it('정상 결제 시 영수증을 반환한다', async () => {
+      const result = await service.processPayment(mockPayment);
+      expect(result.receiptId).toBeDefined();
+    });
+
+    it('잔액 부족 시 InsufficientFundsError를 던진다', async () => {
+      await expect(
+        service.processPayment(insufficientPayment)
+      ).rejects.toThrow(InsufficientFundsError);
+    });
+  });
+});
+```
+
+### 리팩토링이 두렵지 않다
+
+예전엔 "건드리면 터질까봐" 레거시 코드를 못 건드렸다.
+
+테스트가 있으니까 자신있게 바꾼다. 테스트 통과하면 되는 거다.
+
+### 버그가 줄었다
+
+당연한 얘기지만 실감이 됐다. 특히 엣지 케이스.
+
+```typescript
+it('amount가 0이면 에러를 던진다', () => {
+  expect(() => service.processPayment({ amount: 0 }))
+    .toThrow('Amount must be positive');
+});
+
+it('amount가 음수면 에러를 던진다', () => {
+  expect(() => service.processPayment({ amount: -100 }))
+    .toThrow('Amount must be positive');
+});
+```
+
+테스트 케이스를 적다 보면 "어? 이 경우는 어떻게 처리하지?"가 보인다.
+
+## 내가 정착한 테스트 전략
+
+### Unit Test: 빠르고 많이
+
+비즈니스 로직이 담긴 Service 위주로 작성. DB 연결 없이 mock으로 처리.
+
+```typescript
+// jest.mock으로 Repository 격리
+const mockUserRepository = {
+  findOne: jest.fn(),
+  save: jest.fn(),
+};
+```
+
+### Integration Test: 핵심 플로우만
+
+실제 DB 연결해서 테스트. 주요 시나리오 위주로.
+
+```typescript
+describe('UserController (Integration)', () => {
+  let app: INestApplication;
+
+  beforeAll(async () => {
+    const moduleRef = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
+
+    app = moduleRef.createNestApplication();
+    await app.init();
+  });
+
+  it('/users (POST) 회원가입 성공', () => {
+    return request(app.getHttpServer())
+      .post('/users')
+      .send({ email: 'test@test.com', password: '1234' })
+      .expect(201);
+  });
+});
+```
+
+### E2E Test: 최소한만
+
+전체 플로우 테스트는 비용이 크다. 결제 같은 핵심 기능만.
+
+## 깨달은 것들
+
+### 테스트는 문서다
+
+신규 입사자에게 "이 API 뭐 하는 거예요?"라고 물으면 테스트 파일을 보여준다.
+
+어떤 입력에 어떤 출력이 나오는지, 어떤 에러가 발생하는지 다 적혀있다.
+
+### 테스트하기 어려운 코드 = 설계가 잘못된 코드
+
+"이거 어떻게 테스트해요?"라는 질문이 나오면 대부분 의존성이 꼬여있거나 함수가 너무 많은 일을 하고 있다.
+
+테스트를 먼저 생각하면 자연스럽게 좋은 설계가 된다.
+
+### 100% 커버리지는 목표가 아니다
+
+처음엔 숫자에 집착했다. 90%, 95%, 100%...
+
+지금은 "이 테스트가 진짜 의미 있나?"를 더 생각한다. 의미 없는 테스트 100개보다 핵심 로직 테스트 10개가 낫다.
+
+## 결론
+
+테스트 코드, 처음엔 귀찮다. 시간도 더 든다.
+
+근데 장애 한 번 터지면 그 시간의 10배를 쓴다. 야근하고, 사과하고, 핫픽스 배포하고.
+
+"시간 없어서 테스트 못 써요"가 아니라 "테스트 안 써서 시간이 없는 거"였다.
+
+지금은 테스트 없이 PR 올리면 불안하다. 그게 정상인 것 같다.
