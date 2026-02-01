@@ -1,7 +1,7 @@
 on:
   push:
     branches:
-      - main
+      - master
 
 name: Pages 배포를 하자.
 
