@@ -1,0 +1,296 @@
+---
+slug: why-nestjs
+title: 4년 후, 왜 NestJS로 갈아탔나
+description: Express로 4년간 개발하다 NestJS로 전환한 이유
+createdAt: "2024/02/15"
+updatedAt: ""
+tags: ["백엔드", "Node.js", "NestJS", "Express", "회고"]
+featured: true
+---
+
+## 들어가며
+
+2019년부터 Express를 썼다. 4년 동안 30개 넘는 프로젝트를 Express로 만들었다.
+
+그러다 2023년 말, 새 프로젝트에서 NestJS를 선택했다. Express가 싫어진 건 아니다. 그냥 필요해졌다.
+
+왜 바꿨을까?
+
+---
+
+## 1. TypeScript가 필요해졌다
+
+Express도 TypeScript를 쓸 수 있다. 근데 설정이 귀찮다.
+
+NestJS는 TypeScript가 기본이다. 설정 없이 바로 쓸 수 있다.
+
+```typescript
+// NestJS - 타입이 기본
+@Controller('/v1/room')
+export class RoomController {
+  constructor(private readonly roomService: RoomService) {}
+
+  @Get('list')
+  @UseGuards(LoginRequired(true))
+  async list(
+    @ReqUser() user: User,
+    @Query() listDto: ListRoomRequestDto,
+  ): Promise<ResponseSuccessDto<RoomListDto>> {
+    const data = await this.roomService.list({ listDto, user });
+    return new ResponseSuccessDto({ data: data.data, meta: data.meta });
+  }
+}
+```
+
+타입 덕분에 IDE 자동완성이 잘 된다. 리팩토링할 때 컴파일러가 잡아준다.
+
+---
+
+## 2. 구조 강제가 오히려 편하다
+
+Express의 자유로움이 장점이었다. 근데 프로젝트가 많아지니까 문제가 생겼다.
+
+```
+// 프로젝트 A
+src/routes/board/board.controller.js
+
+// 프로젝트 B  
+src/api/board/board.ctrl.js
+
+// 프로젝트 C
+src/controllers/boardController.js
+```
+
+같은 사람이 만들었는데 구조가 다 달랐다. 오래된 프로젝트 유지보수할 때 헷갈렸다.
+
+NestJS는 구조를 강제한다:
+
+```
+src/v1/room/
+├── dto/
+│   ├── req/
+│   │   └── create-room-request.dto.ts
+│   └── res/
+│       └── room.dto.ts
+├── room.controller.ts
+├── room.service.ts
+├── room.model.ts
+└── room.module.ts
+```
+
+모든 프로젝트가 같은 구조다. 새 프로젝트 들어가도 바로 파악된다.
+
+---
+
+## 3. 데코레이터가 깔끔하다
+
+Express에서 Swagger 문서 작성:
+
+```javascript
+/**
+ * @swagger
+ * /board/register:
+ *   post:
+ *     tags: [board]
+ *     summary: (권한 - 로그인) 게시판 등록
+ *     parameters:
+ *       - in: header
+ *         name: authorization
+ *       - in: body
+ *         name: body
+ *         schema:
+ *           $ref: '#/definitions/board'
+ */
+router.post('/board/register', ...);
+```
+
+NestJS에서 Swagger 문서 작성:
+
+```typescript
+@ApiOperation({
+  summary: '(권한: 일반) 채팅방 등록',
+  description: '채팅방 등록 합니다.',
+})
+@ApiDataResponse(Room)
+@Post('register')
+@UseGuards(LoginRequired(true))
+async create(@Body() roomDto: CreateRoomRequestDto) { ... }
+```
+
+JSDoc 주석 vs 데코레이터. 데코레이터가 코드와 더 붙어있어서 관리하기 편하다.
+
+---
+
+## 4. DTO 패턴이 강제된다
+
+Express에서는 Joi로 검증했다:
+
+```javascript
+// 스키마 따로
+const boardSchema = Joi.object({
+  title: Joi.string().required(),
+  content: Joi.string().required(),
+});
+
+// 라우트에서 연결
+router.post('/board', validator.body(boardSchema), controller.create);
+```
+
+NestJS는 DTO 클래스에 검증이 포함된다:
+
+```typescript
+// DTO 클래스 하나에 타입 + 검증 + 문서화
+export class CreateRoomRequestDto {
+  @ApiProperty({ description: '방 이름' })
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @ApiProperty({ description: '설명', required: false })
+  @IsString()
+  @IsOptional()
+  description?: string;
+}
+```
+
+타입, 검증, Swagger 문서가 한 곳에 있다. 관리 포인트가 줄었다.
+
+---
+
+## 5. 의존성 주입이 편하다
+
+Express에서는 직접 require했다:
+
+```javascript
+// board.controller.js
+const boardService = require('./board.service');
+
+const create = async (req, res) => {
+  const result = await boardService.create(req.body);
+  res.json(result);
+};
+```
+
+NestJS는 의존성 주입을 쓴다:
+
+```typescript
+@Controller('/v1/room')
+export class RoomController {
+  // 생성자에서 주입받음
+  constructor(private readonly roomService: RoomService) {}
+
+  async create(@Body() dto: CreateRoomRequestDto) {
+    return this.roomService.create(dto);
+  }
+}
+```
+
+테스트할 때 Mock 주입이 쉬워졌다:
+
+```typescript
+const module = await Test.createTestingModule({
+  controllers: [RoomController],
+  providers: [
+    { provide: RoomService, useValue: mockRoomService },
+  ],
+}).compile();
+```
+
+---
+
+## 6. 모듈 시스템이 좋다
+
+NestJS는 기능별로 모듈을 나눈다:
+
+```typescript
+// room.module.ts
+@Module({
+  imports: [SequelizeModule.forFeature([Room, RoomUser])],
+  controllers: [RoomController],
+  providers: [RoomService],
+  exports: [RoomService],
+})
+export class RoomModule {}
+
+// app.module.ts
+@Module({
+  imports: [
+    RoomModule,
+    UserModule,
+    ChatModule,
+    // ...
+  ],
+})
+export class AppModule {}
+```
+
+모듈 단위로 기능이 캡슐화된다. 나중에 마이크로서비스로 분리하기도 쉽다.
+
+---
+
+## 7. 실시간 통신 지원
+
+Express에서 Socket.io 붙이려면 따로 설정해야 했다.
+
+NestJS는 WebSocket이 내장되어 있다:
+
+```typescript
+@WebSocketGateway({ cors: true })
+export class ChatGateway {
+  @WebSocketServer()
+  server: Server;
+
+  @SubscribeMessage('message')
+  handleMessage(client: Socket, payload: any): void {
+    this.server.emit('message', payload);
+  }
+}
+```
+
+데코레이터로 이벤트 핸들링. HTTP API랑 같은 패턴이라 일관성 있다.
+
+---
+
+## 그래서 Express는 버린 건가?
+
+아니다.
+
+- **간단한 API 서버** → Express
+- **빠른 프로토타입** → Express
+- **장기 운영 프로젝트** → NestJS
+- **팀 프로젝트** → NestJS
+
+상황에 맞게 쓴다. 도구는 도구일 뿐이다.
+
+---
+
+## 전환하면서 느낀 점
+
+### 장점
+- 코드 일관성이 높아졌다
+- TypeScript 덕에 버그가 줄었다
+- 테스트 작성이 쉬워졌다
+- 새 팀원 온보딩이 빨라졌다
+
+### 단점
+- 초기 학습 비용이 있다
+- 보일러플레이트가 많다
+- 간단한 거 만들 때는 오버킬
+
+---
+
+## 마무리
+
+Express로 4년, NestJS로 1년.
+
+둘 다 좋은 프레임워크다. Express가 자유로운 스케치북이라면, NestJS는 눈금 있는 노트다.
+
+신입 때는 스케치북이 필요했다. 마음대로 그리면서 배웠다.
+
+지금은 눈금 있는 노트가 편하다. 일관된 구조 안에서 빠르게 작업한다.
+
+결국 "뭐가 더 좋냐"가 아니라 "지금 뭐가 필요하냐"의 문제다.
+
+---
+
+*이전 글: [왜 Express를 선택했나](/blog/why-express)*
