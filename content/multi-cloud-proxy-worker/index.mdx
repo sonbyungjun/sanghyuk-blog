@@ -1,0 +1,259 @@
+---
+slug: multi-cloud-proxy-worker
+title: "멀티 클라우드 프록시 구축기 - 홍콩 리전 우회와 SSE 호환성 삽질"
+description: "Cloudflare Workers에서 Railway로 프록시하며 겪은 리전 우회, SSE 스트리밍 호환성, Gemini API 에러 디버깅 경험"
+createdAt: "2025/09/12"
+updatedAt: ""
+tags: ["Cloudflare", "Railway", "프록시", "SSE", "Gemini"]
+featured: false
+thumbnail: ./thumbnail.png
+---
+
+## 프로젝트 개요
+
+**프로젝트**: LLM Worker (AI API 프록시)  
+**개발 기간**: 2025.08 (약 2주)  
+**기술 스택**: Cloudflare Workers, Railway, Bun, SSE  
+**주요 작업**: 19 commits
+
+---
+
+## 문제 상황
+
+우리 서비스는 Cloudflare Workers에서 LLM API를 호출한다. 근데 특정 사용자들에게서 이상한 에러가 터졌다.
+
+> "Gemini API 호출이 안 돼요"
+
+로그를 까보니 **홍콩 리전**에서 접속한 사용자들이었다.
+
+---
+
+## 홍콩 리전 문제
+
+Google의 Gemini API는 홍콩에서 접근이 제한된다. Cloudflare Workers는 사용자와 가까운 엣지에서 실행되기 때문에, 홍콩 사용자의 요청은 홍콩 엣지에서 처리된다.
+
+```
+홍콩 사용자 → 홍콩 CF Edge → Gemini API ❌
+```
+
+해결책: 홍콩 요청만 다른 리전으로 우회시키자.
+
+---
+
+## Railway 프록시 구축
+
+```bash
+49614db 2025-08-26 feat: railway 설정
+57a5689 2025-08-27 feat: 홍콩 리전 감지 시 Railway 서버로 프록시
+```
+
+Railway에 같은 API 서버를 하나 더 띄웠다. Railway는 리전을 선택할 수 있으니까.
+
+```typescript
+// 리전 감지
+const cfRegion = request.cf?.colo; // Cloudflare 엣지 코드
+
+const isHongKong = cfRegion === 'HKG';
+
+if (isHongKong) {
+  // Railway 서버로 프록시
+  return proxyToRailway(request);
+}
+```
+
+Cloudflare의 `request.cf.colo`로 현재 엣지 위치를 알 수 있다.
+
+---
+
+## SSE 호환성 지옥
+
+프록시는 됐는데 스트리밍 응답이 안 됐다.
+
+```bash
+c8a73a1 2025-08-27 fix: Railway와 Cloudflare 환경 호환성을 위한 조건부 SSE 헤더 설정
+dd472f7 2025-08-27 fix: Railway SSE 헤더 명시적 설정
+c35f0ba 2025-08-26 fix: /v2/models text/event-stream 헤더 명시
+```
+
+AI 응답은 Server-Sent Events(SSE)로 스트리밍된다. 문제는 Cloudflare와 Railway가 SSE를 다르게 처리한다는 것.
+
+### Cloudflare에서의 SSE
+
+```typescript
+// Cloudflare Workers
+return new Response(stream, {
+  headers: {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+  }
+});
+```
+
+### Railway에서의 SSE
+
+Railway는 프록시 뒤에서 돌아가기 때문에 추가 헤더가 필요했다.
+
+```typescript
+// Railway 환경
+const isRailway = process.env.RAILWAY_ENVIRONMENT;
+
+const headers = {
+  'Content-Type': 'text/event-stream',
+  'Cache-Control': 'no-cache',
+  'X-Accel-Buffering': 'no',  // nginx 버퍼링 비활성화
+};
+
+if (isRailway) {
+  headers['Connection'] = 'keep-alive';
+}
+```
+
+`X-Accel-Buffering: no`가 핵심이었다. 이게 없으면 nginx가 응답을 버퍼링해서 스트리밍이 안 된다.
+
+---
+
+## 환경변수 로딩 삽질
+
+```bash
+4502fae 2025-08-26 fix: env 로드하는방법 변경
+d885e57 2025-08-26 fix: env 파일 cloudflare 종속성 제거
+```
+
+Cloudflare Workers와 Railway는 환경변수 로딩 방식이 다르다.
+
+**Cloudflare Workers:**
+```typescript
+// wrangler.toml에 정의하거나 대시보드에서 설정
+export default {
+  fetch(request, env) {
+    const apiKey = env.API_KEY;
+  }
+}
+```
+
+**Railway (Bun):**
+```typescript
+// .env 파일 또는 Railway 대시보드
+const apiKey = process.env.API_KEY;
+// 또는
+const apiKey = Bun.env.API_KEY;
+```
+
+같은 코드베이스로 두 환경을 지원하려면:
+
+```typescript
+function getEnv(key: string): string {
+  // Cloudflare Workers
+  if (typeof globalThis.env !== 'undefined') {
+    return globalThis.env[key];
+  }
+  // Node.js / Bun
+  return process.env[key] ?? '';
+}
+```
+
+---
+
+## Gemini API 에러 수정
+
+```bash
+6476d95 2025-09-05 fix: Gemini API 이미지 처리 및 Function Calling 에러 수정
+```
+
+프록시는 잘 되는데 Gemini 특유의 에러가 있었다.
+
+### 이미지 처리
+
+Gemini는 이미지를 base64로 받는데, 포맷이 까다롭다:
+
+```typescript
+// OpenAI 스타일
+{
+  type: 'image_url',
+  image_url: { url: 'data:image/png;base64,...' }
+}
+
+// Gemini 스타일
+{
+  inlineData: {
+    mimeType: 'image/png',
+    data: '...' // base64, data: prefix 없이
+  }
+}
+```
+
+### Function Calling
+
+Gemini의 function calling 응답도 형식이 다르다:
+
+```typescript
+// OpenAI
+{
+  tool_calls: [{
+    function: { name: 'search', arguments: '{"query":"..."}' }
+  }]
+}
+
+// Gemini
+{
+  functionCall: {
+    name: 'search',
+    args: { query: '...' }  // 이미 파싱된 객체
+  }
+}
+```
+
+이런 차이점들을 프록시 레이어에서 변환해줬다.
+
+---
+
+## 최종 아키텍처
+
+```
+사용자 요청
+    ↓
+Cloudflare Workers (엣지)
+    ↓
+[리전 체크]
+    ├─ 홍콩 → Railway (US/EU) → AI API
+    └─ 기타 → 직접 호출 → AI API
+    ↓
+SSE 스트리밍 응답
+```
+
+---
+
+## 배운 점
+
+### 1. 엣지 컴퓨팅의 양날의 검
+
+사용자와 가까워서 빠르지만, 지역 제한에 걸릴 수 있다. 멀티 클라우드 폴백은 필수.
+
+### 2. SSE는 환경마다 다르다
+
+같은 코드도 Cloudflare, Railway, Vercel에서 다르게 동작한다. 각 환경의 프록시/버퍼링 설정을 이해해야 한다.
+
+### 3. API 변환 레이어의 가치
+
+OpenAI 호환 API로 통일해두면 프론트엔드 코드 변경 없이 백엔드에서 여러 AI 프로바이더를 교체할 수 있다.
+
+### 4. 로그로 디버깅
+
+```bash
+4d701b0 2025-08-27 refactor: 홍콩 프록시 로그 개선 및 테스트 코드 제거
+```
+
+프록시 서버는 문제가 생겨도 원인을 찾기 어렵다. 요청/응답을 상세히 로깅해야 한다.
+
+---
+
+## 마무리
+
+"홍콩에서 안 돼요" 한 마디에서 시작한 작업이 멀티 클라우드 프록시 구축으로 끝났다.
+
+클라우드 서비스를 쓰면 인프라 걱정이 없을 줄 알았는데, 오히려 여러 클라우드의 특성을 다 이해해야 했다. 그래도 덕분에 엣지 컴퓨팅과 SSE에 대해 깊이 알게 됐다.
+
+---
+
+*"Works on my machine"은 클라우드 시대에도 유효하다. 내 리전에서는 되니까.*
