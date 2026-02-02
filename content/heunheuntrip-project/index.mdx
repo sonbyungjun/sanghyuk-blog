@@ -1,0 +1,167 @@
+---
+slug: "heunheuntrip-project"
+title: "학원 팀 프로젝트 회고 - 흔흔트립"
+description: "5명이 3개월간 만든 숙소 예약 서비스. Spring, AWS, 결제 시스템까지 처음으로 제대로 된 팀 프로젝트를 경험했다."
+createdAt: "2019/07/15"
+updatedAt: ""
+tags: ["회고", "Spring", "AWS", "팀프로젝트"]
+featured: false
+---
+
+학원 수료 프로젝트로 3개월간 5명이서 만든 숙소 예약 서비스다. 에어비앤비를 벤치마킹해서 호스트가 숙소를 등록하고 게스트가 예약할 수 있는 플랫폼을 만들었다.
+
+## 프로젝트 개요
+
+- **기간**: 2019년 4월 ~ 6월 (약 3개월)
+- **인원**: 5명
+- **내 역할**: Back-end, Server, Database (전담) / Front-end (보조)
+- **서비스**: 숙소 호스팅 및 예약 플랫폼
+
+## 기술 스택
+
+- **Backend**: Java, Spring MVC, MyBatis
+- **Frontend**: JavaScript, Bootstrap, Handlebars
+- **Database**: MariaDB
+- **Server**: AWS EC2, S3
+- **결제**: I'mPort (아임포트)
+- **API**: 다음 주소/지도 API
+
+## 내가 맡은 기능들
+
+### 1. 숙소 등록 시스템
+
+호스트가 단계별로 숙소 정보를 입력하는 기능. fullpage.js로 스텝 바이 스텝 UI를 구현했다.
+
+**핵심 구현:**
+- 다음 주소 API로 주소 검색 → 지도 API로 위도/경도 변환
+- 파일 업로더로 이미지 다중 업로드
+- Handlebars 템플릿으로 동적 렌더링
+
+**겪은 문제:**
+다음 주소 API는 좌표를 안 준다. 주소만 준다. 그래서 주소 검색 후 다음 지도 API의 geocoder를 다시 호출해서 좌표를 뽑아냈다. API 두 개를 연결해서 쓴 첫 경험이었다.
+
+### 2. 숙소 검색 (반경 검색)
+
+지역명이나 역 이름으로 검색하면 해당 위치 반경 5km 내 숙소를 찾아준다.
+
+```sql
+-- 위도/경도 기반 반경 검색 쿼리
+SELECT * FROM room 
+WHERE (6371 * acos(cos(radians(#{lat})) 
+  * cos(radians(latitude)) 
+  * cos(radians(longitude) - radians(#{lng})) 
+  + sin(radians(#{lat})) 
+  * sin(radians(latitude)))) < 5
+```
+
+Haversine 공식이라는 걸 처음 알았다. 지구가 둥글어서 단순 거리 계산이 안 된다는 것도.
+
+### 3. 결제 및 예약
+
+아임포트를 연동해서 실제 결제가 되는 시스템을 만들었다.
+
+**결제 플로우:**
+1. 클라이언트 → 서버: 숙소 번호, 체크인/아웃 날짜 전송
+2. 서버: 주문번호, 금액 생성 후 응답
+3. 클라이언트: 아임포트로 결제 진행, 승인번호 수신
+4. 클라이언트 → 서버: 승인번호 전송
+5. 서버 → 아임포트: 승인번호로 결제 정보 조회
+6. 서버: 금액 검증 후 DB 저장 (불일치 시 결제 취소)
+
+**동시성 이슈:**
+같은 날짜에 두 명이 동시에 예약하면? `synchronized` 블록으로 해결했다. 지금 생각하면 DB 레벨에서 처리하는 게 맞지만, 당시엔 이게 최선이었다.
+
+### 4. 로그인 로그 시스템
+
+Spring Interceptor로 로그인 시도마다 기록을 남겼다.
+
+```java
+@Component
+public class LogInterceptor implements HandlerInterceptor {
+    
+    @Override
+    public boolean preHandle(HttpServletRequest request, 
+                            HttpServletResponse response, 
+                            Object handler) {
+        request.setAttribute("startTime", System.currentTimeMillis());
+        return true;
+    }
+    
+    @Override
+    public void afterCompletion(HttpServletRequest request, 
+                               HttpServletResponse response, 
+                               Object handler, Exception ex) {
+        // IP, 요청시간, 지연시간, 성공/실패 여부 저장
+    }
+}
+```
+
+관리자가 로그인 시도 현황을 볼 수 있게 했다. 보안 쪽을 처음 신경 써본 기능이었다.
+
+### 5. AWS 인프라 구축
+
+EC2 두 대(웹 서버, DB 서버)와 S3를 분리 구성했다.
+
+```
+[Client] → [EC2 - Tomcat/Apache] → [EC2 - MariaDB]
+                ↓
+            [S3 - Images]
+```
+
+팀원들이 각자 로컬 DB 쓰다가 데이터가 안 맞아서 고생했다. AWS에 공용 DB 올리니까 바로 해결됐다. 인프라 분리의 필요성을 체감한 순간.
+
+### 6. Spring Scheduler
+
+매일 자동으로 돌아가는 배치 작업들:
+
+- **06:00**: S3와 DB 비교해서 고아 파일 삭제
+- **10:00**: 오늘 체크인 예약 상태 변경
+- **12:00**: 오늘 체크아웃 예약 상태 변경
+
+```java
+@Scheduled(cron = "0 0 6 * * *")
+public void cleanupOrphanFiles() {
+    // S3 파일 목록과 DB 비교 후 삭제
+}
+```
+
+파일 업로드 중 에러 나면 S3에만 파일이 남는다. 이런 쓰레기 데이터를 자동으로 정리하게 했다.
+
+## 배운 것들
+
+### 기술적으로
+
+- **Spring MVC 구조**: Controller → Service → DAO 패턴
+- **MyBatis**: XML 매퍼로 SQL 관리하는 방식
+- **AWS**: EC2, S3 기본 사용법
+- **결제 연동**: PG사 API 연동 플로우
+- **API 조합**: 여러 외부 API를 엮어서 쓰는 방법
+
+### 협업 측면
+
+- **Git 충돌**: 5명이 같은 저장소에 푸시하면서 merge 지옥 경험
+- **DB 공유**: 로컬 DB의 한계, 공용 서버의 필요성
+- **역할 분담**: 백엔드/프론트엔드 경계에서의 협업
+
+## 아쉬운 점
+
+지금 다시 보면 부끄러운 코드가 많다.
+
+- **커밋 메시지**: "버그 수정"이 대부분... 뭘 수정했는지 알 수가 없다
+- **예외 처리**: try-catch로 다 감싸고 에러 로그만 찍는 패턴
+- **동시성 처리**: synchronized보다 DB 락이 맞았다
+- **테스트 코드**: 전무. 수동 테스트만 했다
+
+그래도 이때 삽질한 덕분에 "이러면 안 되겠구나"를 배웠다.
+
+## 결과
+
+학원 수료 발표에서 좋은 평가를 받았다. 시연 영상도 찍고, 베타 서비스로 실제 배포까지 해봤다.
+
+3개월간 밤새면서 만든 프로젝트. 코드는 엉망이었지만, 처음으로 "서비스"라는 걸 만들어본 경험이었다. 이때 느낀 성취감이 개발자로 계속 가야겠다고 결심하게 만들었다.
+
+---
+
+**GitHub**: https://github.com/sonbyungjun/heunheuntrip
+
+**시연 영상**: https://www.youtube.com/watch?v=hBiv0t-dOVM
