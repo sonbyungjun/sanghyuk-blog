@@ -39,39 +39,42 @@ const PostCard = ({
       >
         {/* Overlay */}
         <div
-          className={`absolute top-0 left-0 w-full h-full sm:h-[280px] md:h-[316px] bg-black/60 z-[2] transition-opacity duration-300 ${
+          className={`absolute top-0 left-0 w-full h-full sm:h-[280px] md:h-[316px] bg-black/60 z-[2] transition-opacity duration-300 flex flex-col justify-between ${
             isHovered ? "opacity-100" : "opacity-0"
           }`}
         >
-          {/* Description */}
-          <div className="absolute bottom-0 left-0 m-5 flex flex-col items-start">
-            <p className="text-base text-white line-clamp-2">{description}</p>
-          </div>
+          {/* Top Section: Tags + Arrow */}
+          <div className="flex justify-between items-start m-5">
+            {/* Tags */}
+            <div className="flex flex-col gap-2.5 max-h-[140px] overflow-hidden">
+              {tags?.slice(0, 4).map((tag) => (
+                <span
+                  key={tag}
+                  className="border-2 border-white rounded-[20px] text-white px-2.5 py-2.5 text-sm font-extrabold w-fit"
+                >
+                  {koreanTagNames[tag] || tag}
+                </span>
+              ))}
+            </div>
 
-          {/* Right Top Arrow Icon */}
-          <div className="absolute top-0 right-0 m-5 bg-white rounded-full w-10 h-10 flex items-center justify-center">
-            <svg
-              fill="#000000"
-              width="30px"
-              height="30px"
-              viewBox="-6 -6.5 24 24"
-              xmlns="http://www.w3.org/2000/svg"
-              preserveAspectRatio="xMinYMin"
-            >
-              <path d="M7.828 2.414H2.243a1 1 0 1 1 0-2h8a.997.997 0 0 1 1 1v8a1 1 0 0 1-2 0V3.828l-6.779 6.779A1 1 0 0 1 1.05 9.192l6.778-6.778z" />
-            </svg>
-          </div>
-
-          {/* Tags */}
-          <div className="absolute flex flex-col left-0 top-0 m-5 gap-2.5">
-            {tags?.map((tag) => (
-              <span
-                key={tag}
-                className="border-2 border-white rounded-[20px] text-white px-2.5 py-2.5 text-sm font-extrabold w-fit"
+            {/* Right Top Arrow Icon */}
+            <div className="bg-white rounded-full w-10 h-10 flex items-center justify-center flex-shrink-0">
+              <svg
+                fill="#000000"
+                width="30px"
+                height="30px"
+                viewBox="-6 -6.5 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+                preserveAspectRatio="xMinYMin"
               >
-                {koreanTagNames[tag] || tag}
-              </span>
-            ))}
+                <path d="M7.828 2.414H2.243a1 1 0 1 1 0-2h8a.997.997 0 0 1 1 1v8a1 1 0 0 1-2 0V3.828l-6.779 6.779A1 1 0 0 1 1.05 9.192l6.778-6.778z" />
+              </svg>
+            </div>
+          </div>
+
+          {/* Bottom Section: Description */}
+          <div className="m-5 mt-0">
+            <p className="text-base text-white line-clamp-2">{description}</p>
           </div>
         </div>
 
