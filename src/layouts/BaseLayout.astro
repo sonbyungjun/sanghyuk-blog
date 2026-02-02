@@ -1,5 +1,6 @@
 ---
 import "@/styles/globals.css";
+import Analytics from "@vercel/analytics/astro";
 
 interface Props {
   title: string;
@@ -85,6 +86,7 @@ const siteTitle = title ? `${title} | 손상혁 블로그` : "손상혁 블로�
     </script> -->
   </head>
   <body class="min-h-screen bg-background text-foreground antialiased">
+    <Analytics />
     <slot />
     <script is:inline>
       document.addEventListener("click", function(e) {
