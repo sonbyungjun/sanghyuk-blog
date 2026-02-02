@@ -3,7 +3,7 @@ User-agent: *
 Allow: /
 
 # Sitemap
-Sitemap: https://sanghyuk.dev/sitemap-index.xml
+Sitemap: https://sonsh.dev/sitemap-index.xml
 
 # Crawl-delay (optional, for polite crawlers)
 Crawl-delay: 1

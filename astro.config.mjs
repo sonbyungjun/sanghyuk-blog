@@ -9,7 +9,7 @@ import {
 } from "@shikijs/transformers";
 
 export default defineConfig({
-  site: "https://sanghyuk.dev",
+  site: "https://sonsh.dev",
   integrations: [
     react(),
     mdx(),
