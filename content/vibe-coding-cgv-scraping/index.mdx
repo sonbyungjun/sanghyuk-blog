@@ -1,0 +1,145 @@
+---
+slug: vibe-coding-cgv-scraping
+title: "바이브 코딩으로 만든 CGV 영화 분석 시스템"
+description: "영화 리뷰 스크래핑부터 AI 감정 분석까지, 바이브 코딩으로 만든 CGV 데이터 파이프라인"
+createdAt: "2025/04/02"
+updatedAt: ""
+tags: ["AI", "바이브코딩", "Bun", "웹스크래핑", "데이터분석"]
+featured: false
+thumbnail: ./thumbnail.png
+---
+
+## 프로젝트 개요
+
+**프로젝트**: CGV 영화 분석 시스템  
+**개발 기간**: 2025.04.02 ~ 2025.04.09 (1주일)  
+**기술 스택**: Bun, Elysia, TypeScript, GPT-4o-mini, Supabase  
+**커밋 수**: 15 commits
+
+---
+
+## 무엇을 만들었나
+
+CGV 영화 데이터를 자동으로 수집하고 AI로 분석하는 시스템이다.
+
+**주요 기능:**
+- 🎬 상영중인 영화 목록 자동 수집
+- ⭐ 에그지수(관람객 평점) 트래킹
+- 💬 리뷰 스크래핑 및 감정 분석
+- 📊 시간별/일별 통계 생성
+- 📧 이메일 리포트 자동 발송
+- 🔥 바이럴 콘텐츠 분석 (네이버, X, YouTube)
+
+---
+
+## 왜 만들었나
+
+영화 마케팅 인사이트가 필요했다. 어떤 영화가 화제인지, 관객 반응이 어떤지를 데이터로 파악하고 싶었다. CGV 에그지수 변화나 SNS 바이럴 트렌드를 자동으로 수집하면 좋겠다고 생각했다.
+
+---
+
+## 시스템 구조
+
+```
+┌─────────────────┐
+│   Cron Jobs     │
+├─────────────────┤
+│ • 영화 목록 수집  │ → 매일 00:00
+│ • 리뷰 스크래핑   │ → 주기적
+│ • AI 감정 분석   │ → 리뷰 수집 후
+│ • 바이럴 스크래핑 │ → 네이버/X/YouTube
+│ • 리포트 생성    │ → 일별
+└─────────────────┘
+         ↓
+┌─────────────────┐
+│    Supabase     │
+│   (데이터 저장)   │
+└─────────────────┘
+```
+
+---
+
+## 바이브 코딩 경험
+
+### 1. 스크래핑 로직 구현
+
+CGV 웹사이트 구조를 파싱하는 코드를 Claude와 함께 작성했다. `@llami/gpt-torch` 라이브러리로 HTML을 분석한다.
+
+```typescript
+const { summaryJSON } = await GPTTorch(html, {});
+const { elements } = summaryJSON;
+
+// 영화 목록 추출
+const retrieveMovieList = async (element: ReadableElement) => {
+  if (element.href?.includes("/movies/detail-view/?midx=")) {
+    movieList.push(element.href.split("midx=")[1]);
+  }
+  // 재귀적으로 탐색
+  if (element.children) {
+    for (const children of element.children) {
+      await retrieveMovieList(children);
+    }
+  }
+};
+```
+
+### 2. AI 감정 분석 파이프라인
+
+수집된 리뷰를 GPT-4o-mini로 분석한다. 동시성 제어도 Claude가 도와줬다.
+
+```typescript
+cronAnalyze({ concurrency: 5, opt: "gpt-4o-mini" });
+cronCGVImageAnalyze({ concurrency: 5, opt: "gpt-4o-mini" });
+```
+
+### 3. 바이럴 멀티플랫폼 분석
+
+네이버 블로그, X(트위터), YouTube까지 확장했다. 각 플랫폼별 스크래핑 로직이 다르지만, Claude와 함께라면 금방 구현할 수 있었다.
+
+---
+
+## 기술적 포인트
+
+### Bun + Elysia 조합
+
+Node.js 대신 Bun을 선택했다. 빠른 실행 속도와 네이티브 TypeScript 지원이 장점이다. Elysia는 Express보다 타입 안전성이 좋다.
+
+### 메모리 모니터링
+
+장시간 돌아가는 스크래핑 작업이라 메모리 누수를 조심해야 했다.
+
+```typescript
+startMemoryMonitor(120000); // 2분마다 체크
+logMemoryUsage("정기 메모리 체크");
+```
+
+### 크론 작업 설계
+
+여러 크론 작업이 서로 의존하지 않도록 설계했다. 영화 목록이 업데이트되면 리뷰 스크래핑이, 리뷰가 수집되면 AI 분석이 순차적으로 실행된다.
+
+---
+
+## 일주일 만에 완성
+
+1주일(04.02~04.09) 동안 15커밋으로 핵심 기능을 모두 구현했다. 바이브 코딩의 속도를 체감한 프로젝트였다.
+
+---
+
+## 배운 점
+
+1. **스크래핑은 생각보다 까다롭다**: 사이트 구조 변경, 봇 차단 등 예외 케이스가 많다
+2. **AI 분석 비용 관리**: GPT-4o-mini를 선택한 이유는 비용 효율성
+3. **멀티플랫폼 데이터 통합**: 각 플랫폼의 데이터 구조가 달라서 정규화가 필요
+4. **자동화의 힘**: 한 번 만들어두면 계속 데이터가 쌓인다
+
+---
+
+## 마무리
+
+영화 산업 데이터를 자동으로 수집하고 분석하는 시스템. 단순히 스크래핑에서 그치지 않고 AI 분석까지 연결한 점이 재밌었다.
+
+바이브 코딩으로 일주일 만에 완성한 데이터 파이프라인. 혼자 했으면 한 달은 걸렸을 것 같다.
+
+---
+
+*이 글은 바이브 코딩 시리즈의 일부입니다.*
