@@ -1,0 +1,227 @@
+---
+slug: friday-gpt-project
+title: AI에게 역할을 부여하면? - Friday GPT 실험기
+description: GPT-4 출시 직후, AI에게 Architect부터 Senior까지 역할을 부여해 자동으로 프로그래밍하게 만든 실험 프로젝트.
+createdAt: "2023/04/06"
+updatedAt: ""
+tags: ["AI", "GPT-4", "자동화", "실험"]
+featured: false
+thumbnail: ./thumbnail.png
+---
+
+## 2023년 4월, GPT-4가 나왔다
+
+GPT-4가 출시되자마자 든 생각:
+
+> "이 녀석한테 역할을 주면 진짜 개발을 할 수 있을까?"
+
+단순히 코드를 생성하는 게 아니라, **팀처럼 역할을 분담**하면 어떨까. Architect가 설계하고, Lead가 구현하고, QA가 테스트하고, Senior가 버그를 고치는 식으로.
+
+그래서 만든 게 **Friday GPT**다.
+
+---
+
+## 프로젝트 개요
+
+### 역할 기반 AI 개발 시스템
+
+```bash
+👩🏻‍⚕️ Architect → 🕵🏻‍♀️ Tech Evangelist → 👩🏻‍💻 Lead → 👩🏻‍🏭 Junior → 👩🏻‍🚀 QA → 👩🏻‍🚒 Senior
+```
+
+각 단계의 AI가 자기 역할에 맞는 프롬프트를 받고, 결과물을 다음 단계로 넘긴다.
+
+### 기술 스택
+
+```
+- Node.js + TypeScript
+- OpenAI GPT-3.5/GPT-4 API
+- Azure TTS (음성 피드백)
+- CLI 기반 인터페이스
+```
+
+---
+
+## 핵심 아이디어: 변증법
+
+기획 단계에서 **정-반-합(These-Antithese-Synthese)** 변증법을 적용했다.
+
+1. **These**: 초기 기획안 생성
+2. **Antithese**: 기획안의 문제점 찾기
+3. **Synthese**: 문제점을 반영한 개선안 생성
+
+이 과정을 기획이 충분히 좋아질 때까지 반복한다.
+
+```typescript
+export const doDialectic = async ({
+  isGoodToGo,
+  synthese: these,
+  reviewCount,
+  userRequest
+}) => {
+  if (isGoodToGo) {
+    return { isGoodToGo, synthese: these }
+  } else {
+    // Antithese: 문제점 찾기
+    const antithese = await doArchitectAntithese(these)
+    
+    // Synthese: 개선안 생성
+    const synthese = await doArchitectSynthese(`${these}\n${antithese}`)
+    
+    const isGoodToGo = findIsGoodToGo(synthese)
+    return { isGoodToGo, synthese }
+  }
+}
+```
+
+---
+
+## 개발 과정
+
+### Day 1: 초기 구현 (2023-04-06)
+
+```bash
+d0eb7d0 Initial commit
+f26d964 feat: 초기 프로젝트 코드 업로드
+5426839 feat: axios 3회이상 재시도하게 추가
+```
+
+첫날 바로 핵심 구조를 잡았다. 역할별 프롬프트와 체이닝 로직.
+
+### Day 2-4: TTS와 개선 (2023-04-10~12)
+
+```bash
+7e16c8c feat: TTS를 Azure 서현 모델로 변경
+a227977 feat: 아키텍트가 기획안 시안들을 여러장 뽑고 취사선택하도록 개선
+```
+
+AI가 작업하는 동안 뭘 하는지 알려주는 게 중요했다. Azure TTS로 음성 피드백을 추가했다.
+
+```
+"요청사항에 따른 3가지 각기 다른 기획 시안을 생성 중입니다."
+"시안 1 요약: 무제한 길이 사칙연산 라이브러리"
+"2번 시안이 선택되었습니다."
+```
+
+터미널에서 혼자 기다리는 것보다 훨씬 나았다.
+
+### 개선: 시안 선택 로직
+
+단일 기획안 대신 **여러 시안을 생성하고 선택**하는 방식으로 바꿨다.
+
+```typescript
+logger(`요청사항에 따른 ${draftCount}가지 각기 다른 기획 시안을 생성 중입니다.`)
+
+const drafts: string[] = []
+for (let i = 1; i <= draftCount; i++) {
+  const draft = await doArchitectThese(userRequest)
+  drafts.push(draft)
+}
+
+// AI가 가장 나은 시안 선택
+const bestDraftSelection = await doArchitectSelection(drafts)
+```
+
+---
+
+## 6개월 후: 리서치 모드 추가 (2023-10)
+
+```bash
+a227977 feat: 인공지능 리서치 모드 추가
+22c3599 feat: function call 추가
+e2ea916 feat: 리서쳐 코드 추가
+```
+
+원래는 개발 기획만 했는데, **웹 리서치 기능**도 추가했다.
+
+```typescript
+const mode = await select({
+  message: '인공지능에게 어떤 작업을 맡기시겠습니까?',
+  choices: [
+    { name: '웹 리서치', value: 'research' },
+    { name: '프로그래밍 기획', value: 'dev' }
+  ]
+})
+```
+
+Function Calling으로 구글 검색 결과를 가져와서 분석하게 했다.
+
+---
+
+## 역할별 프롬프트 설계
+
+### 👩🏻‍⚕️ Architect
+
+> "최초 요청에 따른 설계를 담당합니다. 먼저 기획안을 5개 뽑아낸 후 가장 나은 기획을 고르며, 개발 기획 퀄리티가 높아질때까지 최대 10회 기획을 개선하기 위해 자체적으로 개선 회의를 진행합니다."
+
+### 🕵🏻‍♀️ Tech Evangelist
+
+> "아키텍트가 완성한 기획안을 토대로 프로젝트 스펙 및 참조 기술 목록을 작성합니다."
+
+### 👩🏻‍💻 Lead Programmer
+
+> "최초로 프로그래밍을 진행하고 실제 이용자에게 리뷰를 요청한 다음 요청사항에 개발 사항을 수정합니다."
+
+---
+
+## 실행 예시
+
+```bash
+npm run dev 문자열로 두 개의 숫자 값을 입력 받아서 무제한 길이로 사칙연산을 할 수 있는 라이브러리를 작성해줘
+```
+
+AI가 단계별로 진행하면서 TTS로 상황을 알려준다:
+
+1. "3가지 기획 시안을 생성 중입니다..."
+2. "시안 1 요약: BigInt 기반 연산 라이브러리"
+3. "2번 시안이 선택되었습니다."
+4. "개발 기획을 추가로 보완하고 있습니다... (3번째 검토)"
+5. "개발 기획이 완료되었습니다. 5번째 검토 만에 완료"
+
+결과 파일들이 `result/` 폴더에 생성된다.
+
+---
+
+## 배운 것들
+
+### 1. 프롬프트 엔지니어링의 중요성
+
+같은 AI라도 **역할을 명확히 부여**하면 결과가 달라진다.
+
+"기획서 써줘" vs "당신은 10년차 아키텍트입니다. 다음 요구사항을 분석하고 3가지 서로 다른 접근방식의 기획안을 작성해주세요."
+
+### 2. 변증법이 생각보다 효과적
+
+정-반-합 구조가 단순해 보이지만, AI가 자신의 결과물을 비판하고 개선하는 데 효과적이다.
+
+### 3. 피드백 루프의 가치
+
+TTS로 진행 상황을 알려주니 기다리는 게 덜 지루했다. UX적으로 중요한 부분.
+
+---
+
+## 한계와 아쉬운 점
+
+**완전 자동화는 아직 먼 얘기다.**
+
+- Junior, QA, Senior 단계는 완성하지 못했다
+- 생성된 코드가 항상 동작하지는 않는다
+- 토큰 비용이 상당하다 (GPT-4 기준)
+
+2023년 4월 시점에서의 실험이었다. 지금은 Claude Code 같은 도구로 훨씬 나은 바이브 코딩이 가능하다.
+
+---
+
+## 마치며
+
+GPT-4 출시 직후, AI가 어디까지 갈 수 있나 궁금해서 만든 프로젝트다.
+
+결론: **역할 분담과 변증법 구조가 AI의 출력 품질을 높인다.**
+
+완벽한 자동 개발은 아니었지만, AI를 활용하는 방법론을 실험해본 의미 있는 프로젝트였다. 이 경험이 나중에 바이브 코딩을 하는 데 도움이 됐다.
+
+---
+
+**GitHub**: https://github.com/hmmhmmhm/friday-gpt
+
+*2023년 4월, GPT-4와 함께한 첫 번째 자동화 실험.*

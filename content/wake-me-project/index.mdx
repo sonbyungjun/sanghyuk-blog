@@ -1,0 +1,275 @@
+---
+slug: wake-me-project
+title: 4일 만에 npm 라이브러리 배포하기 - Wake Me 개발기
+description: TensorFlow.js로 박수 소리를 감지하는 React 컴포넌트를 만들고 npm에 배포했다. 4일 만에 v1.4.3까지.
+createdAt: "2025/01/31"
+updatedAt: ""
+tags: ["TensorFlow.js", "React", "npm", "오픈소스"]
+featured: false
+thumbnail: ./thumbnail.png
+---
+
+## 아이디어: 박수로 AI 깨우기
+
+음성 AI 서비스를 만들다가 생각났다.
+
+> "Hey Siri"나 "OK Google" 대신, 박수나 손가락 튕김으로 AI를 깨울 수 없을까?
+
+음성 명령은 공공장소에서 민망하다. 하지만 박수 한 번이면?
+
+그래서 **Wake Me**를 만들었다. TensorFlow.js로 박수 소리를 감지하는 React 컴포넌트.
+
+---
+
+## 4일간의 개발 기록
+
+### Day 1: 초기 구현과 첫 배포 (2025-01-31)
+
+하루 만에 v1.0.2부터 v1.4.2까지 배포했다. 커밋 로그가 말해준다:
+
+```bash
+7c9b4aa chore: Initial
+778aedc chore: Update dependencies
+149a6ec chore: release v1.0.2
+a560a50 chore: release v1.0.3
+ee8fe78 feat: Added snapThreshold and improved documentation
+230f8a8 chore: release v1.1.0
+a4df4f3 feat: Lower snapThreshold to 0.95
+6aca218 chore: release v1.2.0
+534ef9d feat: Add vanilla usage examples
+c6489fe feat: Add vanilla usage examples
+c8914f6 chore: release v1.3.0
+1bd9d68 feat: If the script path is intentionally provided as null
+c8d0985 chore: release v1.4.0
+f46c008 chore: Changed showcase URL to be mobile compatible
+359d90e chore: release v1.4.1
+b45700d chore: Add a GitHub repo path
+a88acc5 chore: release v1.4.2
+```
+
+**하루에 8번 릴리즈.** 사용하면서 바로바로 개선했다.
+
+### Day 2-3: 문서화와 마무리
+
+```bash
+2c83861 chore: Correcting misstatements
+16b3918 chore: release v1.4.3
+```
+
+온라인 데모를 CodePen에 올리고, README를 다듬었다.
+
+---
+
+## 핵심 구현
+
+### TensorFlow.js 모델 로딩
+
+Speech Commands 모델을 사용해서 박수와 손가락 스냅을 구분한다.
+
+```typescript
+const detectSnap = async () => {
+  async function createModel() {
+    const recognizer = speechCommands.create(
+      "BROWSER_FFT",
+      undefined,
+      checkpointURL,
+      metadataURL
+    );
+    await recognizer.ensureModelLoaded();
+    return recognizer;
+  }
+
+  const recognizer = await createModel();
+  const classLabels = recognizer.wordLabels();
+  const snapLabelIndex = classLabels.indexOf("Snap");
+  const fingerSnapLabelIndex = classLabels.indexOf("FingerSnap");
+
+  recognizer.listen((result) => {
+    const scores = result.scores;
+    const snapScore = scores[snapLabelIndex];
+    const fingerSnapScore = scores[fingerSnapLabelIndex];
+    
+    if (snapScore >= snapThreshold || fingerSnapScore >= snapThreshold)
+      onSnap?.();
+    else 
+      onNoise?.(snapScore);
+  }, {
+    includeSpectrogram: true,
+    probabilityThreshold: 0.75,
+    invokeCallbackOnNoiseAndUnknown: true,
+    overlapFactor: 0.5,
+  });
+
+  return () => recognizer.stopListening();
+};
+```
+
+### React 컴포넌트
+
+사용법을 최대한 간단하게 만들었다:
+
+```tsx
+import { WakeMe } from "wake-me";
+
+function App() {
+  return <WakeMe onSnap={() => console.log("박수 감지!")} />;
+}
+```
+
+컴포넌트가 마운트되면 자동으로 마이크 권한 요청하고 감지 시작.
+
+---
+
+## 핵심 결정들
+
+### 1. snapThreshold 기본값
+
+처음엔 1.0으로 했다가 너무 민감해서 0.95로 낮췄다.
+
+```bash
+a4df4f3 feat: Lower snapThreshold to 0.95 (for ease of demonstration)
+```
+
+사용자가 조절할 수 있게 props로 노출:
+
+```tsx
+<WakeMe 
+  onSnap={() => {}} 
+  snapThreshold={0.9}  // 더 민감하게
+/>
+```
+
+### 2. Vanilla JS 지원
+
+React 없이도 쓸 수 있게 했다:
+
+```bash
+534ef9d feat: Add vanilla usage examples
+```
+
+```html
+<script src="https://cdn.jsdelivr.net/npm/wake-me@latest/dist/vanilla/vanilla.global.js"></script>
+<script>
+  const wakeMe = new WakeMe({
+    onSnap: () => console.log("Snap!")
+  });
+  wakeMe.init();
+</script>
+```
+
+### 3. 스크립트 경로 커스터마이징
+
+CDN을 못 쓰는 환경을 위해 로컬 경로 지정 가능:
+
+```bash
+1bd9d68 feat: If the script path is intentionally provided as null, the script will not be loaded.
+```
+
+```tsx
+<WakeMe
+  tfScriptUrl="/scripts/tf.min.js"
+  speechCommandsScriptUrl="/scripts/speech-commands.min.js"
+  modelBaseUrl="/models/"
+/>
+```
+
+---
+
+## 사용 사례
+
+README에 적은 활용 예시들:
+
+- 🎙️ **AI 웨이크워드 대체**: "Hey Siri" 대신 박수로 AI 활성화
+- 🎮 **게임 조작**: 핸즈프리 게임 인터랙션
+- 🎭 **프레젠테이션**: 슬라이드 전환
+- 👥 **접근성**: 신체 제약이 있는 사용자를 위한 대체 입력
+
+---
+
+## npm 배포 과정
+
+### package.json 설정
+
+```json
+{
+  "name": "wake-me",
+  "version": "1.4.3",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist", "public"],
+  "peerDependencies": {
+    "react": ">=16.8.0"
+  }
+}
+```
+
+### 모델 파일 번들링
+
+TensorFlow 모델 파일(model.json, metadata.json, *.bin)을 `public/snap/` 폴더에 포함해서 CDN으로 서빙.
+
+```
+https://cdn.jsdelivr.net/npm/wake-me@latest/public/snap/model.json
+```
+
+---
+
+## 온라인 데모
+
+CodePen에 데모를 올렸다:
+
+```bash
+87e9be7 docs: Add an online showcase
+f46c008 chore: Changed showcase URL to be mobile compatible
+```
+
+[CodePen 데모](https://codepen.io/hmmhmmhm/full/RNbdjeV)에서 직접 테스트해볼 수 있다.
+
+⚠️ **주의**: 이어폰 대신 외부 스피커와 마이크를 사용해야 제대로 동작한다.
+
+---
+
+## 배운 것들
+
+### 1. 빠른 이터레이션의 가치
+
+하루에 8번 릴리즈하면서 배웠다: **일단 배포하고 개선하자.**
+
+완벽하게 만들려고 기다리면 영원히 안 나간다.
+
+### 2. 문서화가 반이다
+
+README 쓰는 데 코드 쓰는 것만큼 시간이 들었다. 하지만 그만큼 가치 있다.
+
+### 3. CDN 활용
+
+jsDelivr가 npm 패키지를 자동으로 CDN으로 서빙해준다. 모델 파일 호스팅 문제가 해결됐다.
+
+---
+
+## 한계
+
+- **정확도**: 박수 외의 소리(문 닫는 소리 등)에도 반응할 때가 있다
+- **브라우저 지원**: 마이크 권한 + TensorFlow.js 필요
+- **이어폰 문제**: 이어폰 착용 시 제대로 안 됨
+
+---
+
+## 마치며
+
+4일 만에 아이디어에서 npm 배포까지. 
+
+TensorFlow.js 덕분에 ML 모델을 브라우저에서 바로 돌릴 수 있었고, 그 결과물을 npm 패키지로 공유할 수 있었다.
+
+```bash
+npm install wake-me
+```
+
+누군가에게 유용하길.
+
+---
+
+**npm**: https://www.npmjs.com/package/wake-me  
+**GitHub**: https://github.com/hmmhmmhm/wake-me  
+**데모**: https://codepen.io/hmmhmmhm/full/RNbdjeV
+
+*2025년 1월, 박수 한 번으로 AI를 깨우는 라이브러리.*
