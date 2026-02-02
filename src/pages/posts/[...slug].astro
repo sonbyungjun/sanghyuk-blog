@@ -95,6 +95,9 @@ const tableOfContents = buildTableOfContents(headings);
   title={post.data.title}
   description={post.data.description}
   image={post.data.thumbnail?.src}
+  publishedTime={new Date(post.data.createdAt.replace(/\//g, "-")).toISOString()}
+  modifiedTime={post.data.updatedAt ? new Date(post.data.updatedAt.replace(/\//g, "-")).toISOString() : undefined}
+  tags={post.data.tags}
 >
   <article class="w-full xl:w-[800px]">
     <PostContentTitle

@@ -1,0 +1,9 @@
+# https://sanghyuk.dev robots.txt
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://sanghyuk.dev/sitemap-index.xml
+
+# Crawl-delay (optional, for polite crawlers)
+Crawl-delay: 1
