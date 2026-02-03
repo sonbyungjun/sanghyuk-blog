@@ -144,14 +144,12 @@ const jsonLd = type === "article" ? {
       window.localStorage.setItem("theme", theme);
     </script>
 
-    <!-- Google Analytics (TODO: 자신의 GA ID로 변경) -->
-    <!-- <script async src="https://www.googletagmanager.com/gtag/js?id=YOUR-GA-ID"></script>
-    <script is:inline>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-      gtag('config', 'YOUR-GA-ID');
-    </script> -->
+    <!-- GoatCounter Analytics -->
+    <script
+      data-goatcounter="https://sonsh.goatcounter.com/count"
+      async
+      src="//gc.zgo.at/count.js"
+    ></script>
   </head>
   <body class="min-h-screen bg-background text-foreground antialiased">
     <Analytics />
