@@ -59,7 +59,13 @@ if (portfolio) {
   }
 
   .portfolio-content :global(hr) {
-    display: none;
+    border: none;
+    border-top: 1px solid #e5e7eb;
+    margin: 2.5rem 0;
+  }
+
+  :global(.dark) .portfolio-content :global(hr) {
+    border-top-color: #374151;
   }
 
   .portfolio-content :global(ul) {
@@ -81,6 +87,15 @@ if (portfolio) {
 
   :global(.dark) .portfolio-content :global(li::marker) {
     color: #6b7280;
+  }
+
+  .portfolio-content :global(h3) {
+    margin-top: 2rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .portfolio-content :global(table) {
+    margin-bottom: 1rem;
   }
 
   .portfolio-content :global(p) {
