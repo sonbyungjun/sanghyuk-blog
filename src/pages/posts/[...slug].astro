@@ -4,7 +4,7 @@ import PostContentTitle from "@/components/astro/PostContentTitle.astro";
 import Profile from "@/components/astro/Profile.astro";
 import RelatedPosts from "@/components/astro/RelatedPosts.astro";
 import { mdxComponents } from "@/components/mdx";
-// import Giscus from "@/components/react/Giscus"; // TODO: 댓글 시스템 설정 후 활성화
+import Giscus from "@/components/react/Giscus";
 import TableOfContents from "@/components/react/TableOfContents";
 import { WORDS_PER_MINUTE } from "@/constants";
 import PostLayout from "@/layouts/PostLayout.astro";
@@ -116,7 +116,7 @@ const tableOfContents = buildTableOfContents(headings);
 
     <RelatedPosts relatedPosts={relatedPosts} />
     <Profile />
-    {/* <Giscus client:idle /> */}
+    <Giscus client:idle />
   </article>
 
   <TableOfContents client:idle tableOfContents={tableOfContents} />
