@@ -118,9 +118,9 @@ const tableOfContents = buildTableOfContents(headings);
       <Content components={mdxComponents} />
     </div>
 
+    <Giscus client:idle />
     <RelatedPosts relatedPosts={relatedPosts} />
     <Profile />
-    <Giscus client:idle />
   </article>
 
   <TableOfContents client:idle tableOfContents={tableOfContents} />
