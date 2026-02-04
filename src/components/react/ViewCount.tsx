@@ -1,39 +1,30 @@
-import { useEffect, useId } from "react";
+import { useEffect, useState } from "react";
 
 interface ViewCountProps {
   path: string;
 }
 
 export default function ViewCount({ path }: ViewCountProps) {
-  const containerId = `vc-${path.replace(/[^a-zA-Z0-9]/g, "-")}`;
+  const [count, setCount] = useState<number | null>(null);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (window.goatcounter?.visit_count) {
-        clearInterval(interval);
-        window.goatcounter.visit_count({
-          append: `#${containerId}`,
-          path: path,
-          type: "html",
-          no_branding: true,
-        });
-      }
-    }, 200);
+    fetch(
+      `https://sonsh.goatcounter.com/counter/${encodeURIComponent(path)}.json`
+    )
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.count) {
+          setCount(Number.parseInt(data.count, 10));
+        }
+      })
+      .catch(() => {});
+  }, [path]);
 
-    return () => clearInterval(interval);
-  }, [path, containerId]);
+  if (count === null) return null;
 
   return (
-    <span className="text-sm text-gray-400 dark:text-gray-500 inline-flex items-center gap-1">
-      조회 <span id={containerId} className="inline" />
+    <span className="text-sm text-gray-400 dark:text-gray-500">
+      조회 {count.toLocaleString()}회
     </span>
   );
-}
-
-declare global {
-  interface Window {
-    goatcounter?: {
-      visit_count: (opts: Record<string, unknown>) => void;
-    };
-  }
 }
