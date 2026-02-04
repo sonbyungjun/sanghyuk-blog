@@ -1,35 +1,44 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef } from "react";
 
 interface ViewCountProps {
   path: string;
 }
 
 export default function ViewCount({ path }: ViewCountProps) {
-  const [count, setCount] = useState<number | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const fetchCount = async () => {
-      try {
-        const res = await fetch(
-          `https://sonsh.goatcounter.com/counter/${encodeURIComponent(path)}.json`
-        );
-        if (res.ok) {
-          const data = await res.json();
-          setCount(data.count_unique || data.count || 0);
-        }
-      } catch {
-        // GoatCounter API 에러 시 조회수 표시 안 함
-      }
-    };
+    const el = containerRef.current;
+    if (!el) return;
 
-    fetchCount();
+    const interval = setInterval(() => {
+      if (window.goatcounter?.visit_count) {
+        clearInterval(interval);
+        window.goatcounter.visit_count({
+          append: el,
+          path: path,
+          type: "html",
+          no_branding: true,
+          attr: { style: "" },
+        });
+      }
+    }, 200);
+
+    return () => clearInterval(interval);
   }, [path]);
 
-  if (count === null) return null;
-
   return (
-    <span className="text-sm text-gray-400 dark:text-gray-500">
-      조회 {count.toLocaleString()}회
+    <span className="text-sm text-gray-400 dark:text-gray-500 inline-flex items-center gap-1">
+      조회{" "}
+      <span ref={containerRef} className="inline" />
     </span>
   );
+}
+
+declare global {
+  interface Window {
+    goatcounter?: {
+      visit_count: (opts: Record<string, unknown>) => void;
+    };
+  }
 }
