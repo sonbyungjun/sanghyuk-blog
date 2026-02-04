@@ -1,36 +1,31 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useId } from "react";
 
 interface ViewCountProps {
   path: string;
 }
 
 export default function ViewCount({ path }: ViewCountProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerId = `vc-${path.replace(/[^a-zA-Z0-9]/g, "-")}`;
 
   useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-
     const interval = setInterval(() => {
       if (window.goatcounter?.visit_count) {
         clearInterval(interval);
         window.goatcounter.visit_count({
-          append: el,
+          append: `#${containerId}`,
           path: path,
           type: "html",
           no_branding: true,
-          attr: { style: "" },
         });
       }
     }, 200);
 
     return () => clearInterval(interval);
-  }, [path]);
+  }, [path, containerId]);
 
   return (
     <span className="text-sm text-gray-400 dark:text-gray-500 inline-flex items-center gap-1">
-      조회{" "}
-      <span ref={containerRef} className="inline" />
+      조회 <span id={containerId} className="inline" />
     </span>
   );
 }
