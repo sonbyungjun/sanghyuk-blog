@@ -13,6 +13,8 @@ NestJS로 전환한 지 1년이 넘었다. 그 사이 회사에서 10개가 넘�
 
 이 글에서는 그 과정에서 배운 실전 패턴들을 정리해본다.
 
+![](./01-nestjs-architecture.jpg)
+
 ## 1. DTO 분리의 중요성
 
 처음에는 하나의 DTO로 생성/수정/조회를 다 처리하려 했다. 실수였다.
@@ -104,6 +106,8 @@ export class AuthService { /* 인증 관련만 */ }
 @Injectable()
 export class UserVerificationService { /* 이메일 인증만 */ }
 ```
+
+![](./02-code-separation.jpg)
 
 ## 3. Repository 패턴 활용
 

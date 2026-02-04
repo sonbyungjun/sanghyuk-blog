@@ -28,6 +28,8 @@ thumbnail: ./thumbnail.png
 
 ---
 
+![](./01-proxy-architecture.jpg)
+
 ## 홍콩 리전 문제
 
 Google의 Gemini API는 홍콩에서 접근이 제한된다. Cloudflare Workers는 사용자와 가까운 엣지에서 실행되기 때문에, 홍콩 사용자의 요청은 홍콩 엣지에서 처리된다.
@@ -64,6 +66,8 @@ if (isHongKong) {
 Cloudflare의 `request.cf.colo`로 현재 엣지 위치를 알 수 있다.
 
 ---
+
+![](./02-sse-streaming.jpg)
 
 ## SSE 호환성 지옥
 
