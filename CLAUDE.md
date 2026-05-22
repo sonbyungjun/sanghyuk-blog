@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is an Astro-based blog/portfolio website (junghyeonsu.com) built with TypeScript, React, and Tailwind CSS v4. The site serves MDX content for blog posts organized by categories and tags, with multilingual support (Korean/English).
+This is an Astro-based blog/portfolio website (sonsh.dev) built with TypeScript, React, and Tailwind CSS v4. The site serves MDX content for blog posts organized by categories and tags, with multilingual support (Korean/English).
 
 ## Development Commands
 

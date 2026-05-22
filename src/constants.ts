@@ -18,7 +18,7 @@ export const koreanTagNames: Record<string, string> = {
 
 export const ALL_POSTS_TAG_NAME = "all posts";
 
-export const DOMAIN = "https://sanghyuk.dev";
+export const DOMAIN = "https://sonsh.dev";
 
 export const POSTS_PER_PAGE = 10;
 

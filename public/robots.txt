@@ -1,4 +1,4 @@
-# https://sanghyuk.dev robots.txt
+# https://sonsh.dev robots.txt
 User-agent: *
 Allow: /
 
