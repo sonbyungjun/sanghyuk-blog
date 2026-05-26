@@ -50,14 +50,15 @@ const IMAGES = [
     slug: "ai-legacy-protocol-gateway",
     file: "01-zone-integration.jpg",
     prompt:
-      "Integration architecture. On the left, THREE identical horizontal rows, each row representing one zone. " +
-      "Every row is the SAME chain of three connected blocks, left to right, joined by small white arrows: " +
-      "first a green block labeled 'PLC' with a small gear icon, then a sky-blue block labeled 'SERVER' with a server/stack icon, " +
-      "then a slate-gray block labeled 'UNITY CLIENT' with a monitor icon. " +
-      "All three rows are visually identical: the three 'PLC' blocks match each other exactly, the three 'SERVER' blocks match, the three 'UNITY CLIENT' blocks match (same color, same icon, same label). " +
-      "From the right end of each row (the SERVER block), a white arrow goes to a single large central purple block labeled 'GATEWAY'. " +
-      "From the gateway, two white arrows point right to a block 'UNIFIED REST API' (top) and a block 'DASHBOARD' (bottom). " +
-      "Data flows PLC -> SERVER -> UNITY CLIENT within each zone, and the GATEWAY taps each zone's SERVER.",
+      "A clean flat conceptual architecture diagram. THREE identical horizontal rows stacked vertically, each representing one industrial zone. " +
+      "In each row, the MAIN data path goes left to right with white arrows: a green block labeled 'PLC' (gear icon) → a sky-blue block labeled 'SERVER' (server/stack icon). The PLC sends data to the SERVER. " +
+      "From each SERVER, the path SPLITS into two separate branches: " +
+      "(1) a SHORT arrow going UP to a small slate-gray block labeled 'UNITY CLIENT' (monitor icon) placed just above the server — this is the existing on-site viewer, drawn as a secondary side-branch; " +
+      "(2) a LONG arrow going RIGHT from the SERVER toward a single large central purple block labeled 'GATEWAY'. " +
+      "All three SERVER blocks send their right-going arrows into the one shared GATEWAY. " +
+      "From the GATEWAY, two white arrows point right to a block 'UNIFIED REST API' (top) and a block 'DASHBOARD' (bottom). " +
+      "CRITICAL: the GATEWAY connects directly to each SERVER, in PARALLEL with the UNITY CLIENT. The UNITY CLIENT must NOT sit between the SERVER and the GATEWAY — it is only a side branch above the server. " +
+      "All three rows look identical (matching PLC, SERVER, UNITY CLIENT blocks).",
   },
   {
     slug: "ai-legacy-protocol-gateway",
