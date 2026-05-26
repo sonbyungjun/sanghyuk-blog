@@ -1,4 +1,4 @@
-# sanghyuk.dev
+# sonsh.dev
 
 손상혁의 개인 블로그
 

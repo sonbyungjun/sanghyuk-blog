@@ -19,3 +19,8 @@ gatsby-schema.graphql
 
 dist/
 .astro/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
