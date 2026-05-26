@@ -5,6 +5,7 @@ import EvidenceRef from "./EvidenceRef";
 import MdxLink from "./MdxLink";
 import MdxParagraph from "./MdxParagraph.astro";
 import ProjectSection from "./ProjectSection";
+import RecentPosts from "./RecentPosts.astro";
 import WorkTimeline from "./WorkTimeline";
 import XPost from "./XPost.astro";
 import YouTubePlayer from "./YouTubePlayer";
@@ -15,6 +16,7 @@ export const mdxComponents = {
   EvidenceRail,
   EvidenceRef,
   ProjectSection,
+  RecentPosts,
   WorkTimeline,
   XPost,
   YouTubePlayer,
