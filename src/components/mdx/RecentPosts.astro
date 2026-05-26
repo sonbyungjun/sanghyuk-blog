@@ -1,0 +1,37 @@
+---
+import { getCollection } from "astro:content";
+
+interface Props {
+  count?: number;
+}
+
+const { count = 5 } = Astro.props;
+
+const allPosts = await getCollection(
+  "blog",
+  ({ data }) =>
+    !data.locale &&
+    data.title !== "손상혁 포트폴리오" &&
+    !data.tags.includes("short") &&
+    !data.tags.includes("side-project-devlog"),
+);
+
+const posts = allPosts
+  .sort((a, b) => {
+    const dateA = new Date(a.data.createdAt.replace(/\//g, "-")).getTime();
+    const dateB = new Date(b.data.createdAt.replace(/\//g, "-")).getTime();
+    return dateB - dateA;
+  })
+  .slice(0, count);
+---
+
+<ul>
+  {
+    posts.map((post) => (
+      <li>
+        <a href={`/posts/${post.data.slug}`}>{post.data.title}</a>
+        {post.data.description ? ` — ${post.data.description}` : ""}
+      </li>
+    ))
+  }
+</ul>
